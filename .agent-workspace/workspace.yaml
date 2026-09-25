@@ -18,7 +18,7 @@ policy:
     base_branch: main
     branch_prefix: task/
     worktree_mode: recommended
-    require_task_branch: true
+    require_task_branch: false
   research:
     require_citations: true
     default_review_after_days: 180

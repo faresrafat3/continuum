@@ -1,6 +1,8 @@
 # WCS generated and disposable zones
-.agent-workspace/generated/
-.agent-workspace/scratch/
+.agent-workspace/generated/*
+!.agent-workspace/generated/README.md
+.agent-workspace/scratch/*
+!.agent-workspace/scratch/README.md
 .agent-workspace/quarantine/*
 !.agent-workspace/quarantine/README.md
 

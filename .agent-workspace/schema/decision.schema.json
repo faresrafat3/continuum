@@ -22,5 +22,5 @@
     "evidence": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "revisit_conditions": {"type": "array", "minItems": 1, "items": {"type": "string"}}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

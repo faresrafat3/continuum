@@ -90,8 +90,9 @@ export default function continuumHandoffPlugin() {
                 const inspection = await ctx.sessionController.inspect(child.sessionId)
                 if (String(inspection.meta.id) !== String(child.sessionId)) throw new Error('fork child identity mismatch')
                 const parentHeader = invocation.agent.session.header
-                if (parentHeader.cwd !== undefined && inspection.meta.cwd !== undefined && String(inspection.meta.cwd) !== String(parentHeader.cwd)) throw new Error('fork child workspace mismatch')
-                if (parentHeader.agentPreset !== undefined && inspection.meta.agentPreset !== undefined && String(inspection.meta.agentPreset) !== String(parentHeader.agentPreset)) throw new Error('fork child preset mismatch')
+                if (inspection.meta.cwd === undefined || inspection.meta.agentPreset === undefined) throw new Error('fork child inspection missing workspace/preset')
+                if (parentHeader.cwd !== undefined && String(inspection.meta.cwd) !== String(parentHeader.cwd)) throw new Error('fork child workspace mismatch')
+                if (parentHeader.agentPreset !== undefined && String(inspection.meta.agentPreset) !== String(parentHeader.agentPreset)) throw new Error('fork child preset mismatch')
               } catch (error) {
                 return { kind: 'error', text: 'Child Session ' + String(child.sessionId) + ' was created but recovery verification failed; parent retained. ' + (error instanceof Error ? error.message : String(error)) }
               }
@@ -190,7 +191,13 @@ function preview(value) {
 function redact(value) {
   return String(value || '')
     .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/gi, '<REDACTED_PRIVATE_KEY>')
+    .replace(/https?:\/\/[^\s\/@:]+:[^\s\/@]+@/gi, 'https://<REDACTED_CREDENTIALS>@')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '<REDACTED_AWS_KEY>')
+    .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '<REDACTED_JWT>')
+    .replace(/\b(?:xoxb|glpat|hf|AIza|npm|pypi)-[A-Za-z0-9_-]{12,}\b/g, '<REDACTED_CREDENTIAL>')
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,;]+/gi, '$1<REDACTED>')
+    .replace(/(authorization\s*[:=]\s*basic\s+)[^\s,;]+/gi, '$1<REDACTED>')
+    .replace(/\bBasic\s+[A-Za-z0-9+/=]{8,}/g, 'Basic <REDACTED>')
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/g, 'Bearer <REDACTED>')
     .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,})\b/g, '<REDACTED>')
     .replace(/((?:api[_-]?key|client[_-]?secret|provider[_-]?key|token|password)\s*[:=]\s*)[^\s#]+/gi, '$1<REDACTED>')

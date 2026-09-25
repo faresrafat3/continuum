@@ -163,7 +163,7 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 
 **[CITED]** Current Letta Code stores long-term memory in an agent-owned Git repository projected as a real checkout. Markdown files under `system/` are injected each turn; other files are discovered/read with ordinary tools. Every edit is versioned by Git. Local-only agents commit to a repository on the current machine and require user-managed backup. 【S-LET-01】
 
-**[CITED]** The public `letta` repository says active source moved to `letta-ai/letta-code` and the old V1 API server is retained on the `archive` branch. Current packaged code is Letta Code 0.33.1, not the archived server. 【S-LET-02】【S-LET-05】
+**[CITED]** The public `letta` repository says active source moved to `letta-ai/letta-code` and the old V1 API server is retained on the `archive` branch. Current packaged code is Letta Code 0.33.1; the final archived V1 release is 0.16.8. The code license is Apache-2.0 with an explicit brand-assets exclusion. 【S-LET-02】【S-LET-05】【S-LET-06】
 
 **[INFERRED]** MemFS is attractive for DSH project conventions and skills because it is inspectable, diffable, and versioned. It also makes memory edits ordinary file writes, so DSH's file permissions, secret filtering, and approval model must cover `$MEMORY_DIR` explicitly.
 
@@ -172,6 +172,8 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 **[CITED]** The interactive CLI starts in `unrestricted` mode. `standard` asks before approval-requiring tools, `acceptEdits` allows edits, and `strict` asks before every tool call. A cross-agent memory guard blocks access to other agents' memory directories even in unrestricted mode unless the parent guard is explicitly disabled. 【S-LET-03】
 
 **[CITED]** Background dreaming can consolidate memory without interrupting work; “Agent reviews before applying” is an extra model review and does not itself ask the user for approval. 【S-LET-04】
+
+**[CITED]** Letta Code 0.33.0 includes a fix to always redact ambient runtime credentials from tool output. This is a positive control, not evidence that arbitrary tool output or memory content is secret-free. 【S-LET-06】
 
 **[INFERRED]** Installing Letta without a DSH-specific `standard`/`strict` policy and memory-path guard would widen the local threat surface. The durable memory and durable tools must be governed by the same approval policy.
 
@@ -480,7 +482,7 @@ Repeat each point/task combination three times with recorded seeds. Separately t
 ### Pre-registered interpretation
 
 - **Falsify the native-first durability recommendation** if Temporal, Restate, or LangGraph has zero correctness/security failures, p95 recovery at least 50% faster, and can meet the integration-complexity budget without adding a mandatory always-on service for the local-only workload. Adopt the winner behind the same DSH adapter.
-- **Falsify the explicit-memory recommendation** if LangMem or Mem0 improves cross-session recall by at least 10 percentage points while correction accuracy falls by no more than 2 points, trusted-policy writes remain zero, and deletion/provenance tests pass.
+- **Falsify the explicit-memory recommendation** if LangMem, Mem0, or Graphiti improves cross-session recall by at least 10 percentage points while correction accuracy falls by no more than 2 points, trusted-policy writes remain zero, and deletion/provenance tests pass.
 - **Falsify every “exactly once by framework” claim** if any framework duplicates an effect after a sink succeeds but before the framework records success, even when the sink lacks idempotency.
 - **Do not adopt a system that fails a security threshold to win latency or recall.** A failed secret, authorization, or poison-containment threshold is disqualifying regardless of aggregate score.
 - Report raw runs, exact package hashes, model/embedding identifiers, configuration, disk growth, cold start, recovery time, and all failures. A single favorable average cannot override a pre-registered hard security or correctness failure.

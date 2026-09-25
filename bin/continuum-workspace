@@ -99,7 +99,13 @@ def list_field(path: Path, key: str) -> list[str]:
 def redact(value: str) -> str:
     text_value = str(value or "")
     text_value = re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----", "<REDACTED_PRIVATE_KEY>", text_value, flags=re.I)
+    text_value = re.sub(r"https?://[^\s/@:]+:[^\s/@]+@", "https://<REDACTED_CREDENTIALS>@", text_value, flags=re.I)
+    text_value = re.sub(r"\bAKIA[0-9A-Z]{16}\b", "<REDACTED_AWS_KEY>", text_value)
+    text_value = re.sub(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b", "<REDACTED_JWT>", text_value)
+    text_value = re.sub(r"\b(?:xoxb|glpat|hf|AIza|npm|pypi)-[A-Za-z0-9_-]{12,}\b", "<REDACTED_CREDENTIAL>", text_value)
     text_value = re.sub(r"(authorization\s*[:=]\s*bearer\s+)[^\s,;]+", r"\1<REDACTED>", text_value, flags=re.I)
+    text_value = re.sub(r"(authorization\s*[:=]\s*basic\s+)[^\s,;]+", r"\1<REDACTED>", text_value, flags=re.I)
+    text_value = re.sub(r"\bBasic\s+[A-Za-z0-9+/=]{8,}", "Basic <REDACTED>", text_value)
     text_value = re.sub(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", "Bearer <REDACTED>", text_value)
     text_value = re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,})\b", "<REDACTED>", text_value)
     text_value = re.sub(r"((?:api[_-]?key|client[_-]?secret|provider[_-]?key|token|password)\s*[:=]\s*)[^\s#]+", r"\1<REDACTED>", text_value, flags=re.I)
@@ -131,6 +137,14 @@ def git_identity(root: Path) -> dict[str, object]:
     }
 
 
+def git_is_ancestor(root: Path, older: str, newer: str) -> bool:
+    import subprocess
+    try:
+        return subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=root, check=False, timeout=5).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def ensure_file(root: Path, relative: str, content: str) -> bool:
     path = root / relative
     if path.exists():
@@ -147,6 +161,10 @@ def init_workspace(args: argparse.Namespace) -> int:
         return 1
     root = requested.resolve()
     root.mkdir(parents=True, exist_ok=True)
+    for relative in ["AGENTS.md", "WORKSPACE.md", ".gitignore"]:
+        if (root / relative).is_symlink():
+            print(json.dumps({"ok": False, "error": f"root policy file must not be a symlink: {relative}"}))
+            return 1
     control = root / ".agent-workspace"
     if control.is_symlink() or (control.exists() and any(path.is_symlink() for path in control.rglob("*"))):
         print(json.dumps({"ok": False, "error": "workspace control directory contains a symlink"}))
@@ -446,6 +464,8 @@ def scope_graph_errors(root: Path, manifest: Path) -> list[str]:
             candidate = Path(scope_path)
             if candidate.is_absolute() or ".." in candidate.parts:
                 errors.append(f"scope path is not repository-relative: {scope_id}")
+            elif candidate.is_symlink() or (root / candidate).is_symlink():
+                errors.append(f"scope path is a symlink: {scope_id} -> {scope_path}")
             elif not (root / candidate).exists():
                 errors.append(f"scope path does not exist: {scope_id} -> {scope_path}")
         dependencies = scope.get("depends_on", []) or []
@@ -499,6 +519,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if layout == "monorepo" and not (root / ".agent-workspace" / "projects").is_dir():
             errors.append("monorepo layout missing .agent-workspace/projects")
         errors.extend(scope_graph_errors(root, manifest))
+    require_task_branch = bool(manifest.exists() and re.search(r"require_task_branch:\s*true", text(manifest)))
     task_ids: set[str] = set()
     run_ids: set[str] = set()
     handoff_ids: set[str] = set()
@@ -556,7 +577,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if handoff_dir.exists():
             for handoff in sorted(handoff_dir.glob("*.md")):
                 raw = text(handoff)
-                for heading in ["Objective and acceptance target", "Confirmed facts and read set", "Completed", "Current operation", "Exact next action", "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts", "Stale or contradictory information"]:
+                for heading in ["Objective and acceptance target", "Confirmed facts and read set", "Completed", "Current operation", "Exact next action", "Decisions/spec/plan changes", "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts", "Stale or contradictory information", "Working tree and uncommitted paths"]:
                     if f"# {heading}" not in raw:
                         errors.append(f"handoff missing body section {heading}: {handoff.relative_to(root)}")
                 if "Source Session:" not in raw and "@[" not in raw:
@@ -597,6 +618,12 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 match = re.match(rf"^{prefix}-\d{{4}}", path.name)
                 if match:
                     target.add(match.group(0))
+                elif path.suffix.lower() in {".md", ".yaml", ".yml"}:
+                    raw_record = text(path) if path.suffix.lower() == ".yaml" else frontmatter(path)
+                    if raw_record:
+                        id_match = re.search(rf"^id:\s*({prefix}-\d{{4}})\s*$", raw_record, re.MULTILINE)
+                        if id_match:
+                            target.add(id_match.group(1))
     # A task dependency cycle is a hard integrity error.
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -679,12 +706,25 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         state = task / "state.yaml"
         declared_branch = scalar(state, "branch") if "branch:" in text(state) else None
         declared_head = scalar(state, "last_verified_commit") if "last_verified_commit:" in text(state) else None
+        if require_task_branch and declared_branch and not declared_branch.startswith("task/"):
+            errors.append(f"task branch policy is not satisfied in {state.relative_to(root)}")
         if declared_branch and git.get("branch") and declared_branch != git.get("branch"):
             errors.append(f"state branch does not match Git branch in {state.relative_to(root)}")
-        if declared_head and declared_head not in {"HEAD", "self"} and git.get("head") and declared_head != git.get("head"):
-            warnings.append(f"state verified commit is behind current Git HEAD in {state.relative_to(root)}")
-        if scalar(state, "working_tree") == "clean" and git.get("status"):
-            errors.append(f"state says clean but Git has changes in {state.relative_to(root)}")
+        if declared_head and declared_head not in {"HEAD", "self"} and git.get("head") and declared_head != git.get("head") and not git_is_ancestor(root, declared_head, str(git.get("head"))):
+            warnings.append(f"state verified commit is not an ancestor of current Git HEAD in {state.relative_to(root)}")
+        if scalar(state, "working_tree") == "clean":
+            status_lines = str(git.get("status") or "").splitlines()
+            if any(str(state.relative_to(root)) in line for line in status_lines):
+                errors.append(f"state says clean but Git has changes in {state.relative_to(root)}")
+            elif status_lines:
+                warnings.append(f"Git has unrelated changes while state is clean in {state.relative_to(root)}")
+        context_file = root / ".agent-workspace" / "generated" / "context" / task.name / "context.md"
+        if context_file.exists():
+            context_text = text(context_file)
+            if scalar(state, "state_revision") and f"state_revision: {scalar(state, 'state_revision')}" not in context_text and f"state_revision={scalar(state, 'state_revision')}" not in context_text:
+                warnings.append(f"generated context may be stale for {task.name}")
+            if git.get("head") and str(git.get("head")) not in context_text:
+                warnings.append(f"generated context Git head is stale for {task.name}")
     gitignore = root / ".gitignore"
     if gitignore.exists():
         ignored = text(gitignore)
@@ -718,6 +758,9 @@ def doctor(args: argparse.Namespace) -> int:
 
 def status(args: argparse.Namespace) -> int:
     root = Path(args.root or ".").expanduser().resolve()
+    if not root.is_dir():
+        print(json.dumps({"ok": False, "error": f"workspace root does not exist: {root}"}))
+        return 1
     tasks = discover_tasks(root)
     rows = []
     for task in tasks:
@@ -770,6 +813,9 @@ def context(args: argparse.Namespace) -> int:
             ))
     seen: set[Path] = set()
     records: list[dict[str, object]] = []
+    total_bytes = 0
+    truncated = False
+    max_context_bytes = 2_000_000
     for path in ordered:
         if path in seen or not path.exists() or not path.is_file():
             continue
@@ -784,6 +830,11 @@ def context(args: argparse.Namespace) -> int:
         seen.add(path)
         source = text(path, 100_000)
         content = redact(source)
+        if total_bytes + len(content.encode("utf-8")) > max_context_bytes:
+            remaining = max(0, max_context_bytes - total_bytes)
+            content = content[:remaining] + "\n[TRUNCATED: aggregate context byte bound reached]"
+            truncated = True
+        total_bytes += len(content.encode("utf-8"))
         records.append({
             "path": str(path.relative_to(root)),
             "source_sha256": digest(path),
@@ -791,8 +842,18 @@ def context(args: argparse.Namespace) -> int:
             "bytes": len(content.encode("utf-8")),
             "content": content,
         })
+        if truncated:
+            break
     git = git_identity(root)
     output = root / ".agent-workspace" / "generated" / "context" / (task.name if task.is_dir() else task.stem)
+    cursor = output
+    while True:
+        if cursor.is_symlink():
+            print(json.dumps({"ok": False, "error": f"context output path is a symlink: {cursor}"}))
+            return 1
+        if cursor == root or cursor.parent == cursor:
+            break
+        cursor = cursor.parent
     output.mkdir(parents=True, exist_ok=True)
     target = output / "context.md"
     lines = [
@@ -806,6 +867,7 @@ def context(args: argparse.Namespace) -> int:
         json.dumps(git, indent=2),
         "```",
         "",
+        f"Aggregate context bytes: {total_bytes}; truncated: {truncated}.",
     ]
     for record in records:
         lines.extend([

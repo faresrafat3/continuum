@@ -16,7 +16,7 @@ execution:
   branch: main
   worktree: null
   started_from_commit: 0d2424f32425cd05cb954111c08ce11d3c849167
-last_verified_commit: HEAD
+last_verified_commit: 158ba435f2865fe0d4d085a5eeebda7fd2a508c7
 working_tree: clean
 dirty_paths: []
 validation:
@@ -30,4 +30,3 @@ assumptions:
   - "Deferred crash/approval/tool-boundary gates are explicitly recorded in docs/acceptance-matrix.md and do not enable unattended recycling."
 extensions:
   code_checkpoint: 158ba435f2865fe0d4d085a5eeebda7fd2a508c7
-  metadata_commit: "self (the commit containing this state file)"

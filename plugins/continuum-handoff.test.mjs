@@ -16,6 +16,7 @@ let goalView
 let forkCalls = 0
 let missingServices = false
 let inspectFailures = 0
+let omitChildFields = false
 const ctx = {
   get(name) {
     if (missingServices) return undefined
@@ -47,7 +48,7 @@ const ctx = {
     },
     async inspect(id) {
       if (inspectFailures > 0) { inspectFailures -= 1; throw new Error('temporary inspect failure') }
-      return { meta: { id: String(id), cwd: '/tmp/example', agentPreset: 'continuum' } }
+      return { meta: { id: String(id), ...(omitChildFields ? {} : { cwd: '/tmp/example', agentPreset: 'continuum' }) } }
     }
   }
 }
@@ -119,6 +120,13 @@ const callsAfterInspectFailure = forkCalls
 const retryAfterInspectFailure = await fork.handler({ agent, rawInput: ' T-0004 ' })
 assert.equal(retryAfterInspectFailure.kind, 'error')
 assert.equal(forkCalls, callsAfterInspectFailure)
+omitChildFields = true
+const missingChildFields = await fork.handler({ agent, rawInput: ' T-0005 ' })
+assert.equal(missingChildFields.kind, 'error')
+const callsAfterMissingFields = forkCalls
+assert.equal((await fork.handler({ agent, rawInput: ' T-0005 ' })).kind, 'error')
+assert.equal(forkCalls, callsAfterMissingFields)
+omitChildFields = false
 
 jobRows = [{ id: 'job-1', kind: 'test', status: 'running' }]
 const jobBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })

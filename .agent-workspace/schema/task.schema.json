@@ -18,5 +18,5 @@
     "related": {"type": "object", "required": ["research", "decisions"], "properties": {"research": {"type": "array", "items": {"type": "string"}}, "decisions": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
     "created_at": {"type": "string"}, "updated_at": {"type": "string"}, "closed_at": {"type": ["string", "null"]}, "outcome": {"type": ["string", "null"]}, "extensions": {"type": "object"}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

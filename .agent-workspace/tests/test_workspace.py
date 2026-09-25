@@ -191,6 +191,32 @@ class WorkspaceCliTests(unittest.TestCase):
             self.assertEqual(doctor.returncode, 1)
             self.assertIn("frontmatter", doctor.stdout)
 
+    def test_init_rejects_symlinked_control_plane(self):
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp)
+            (root / ".agent-workspace").symlink_to(Path(outside), target_is_directory=True)
+            result = run("--root", str(root), "init")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(list(Path(outside).iterdir()), [])
+
+    def test_context_rejects_symlinked_task(self):
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            outside_file = Path(outside) / "task.md"
+            outside_file.write_text("# outside\n", encoding="utf-8")
+            (root / ".agent-workspace" / "tasks" / "T-0001-linked.md").symlink_to(outside_file)
+            result = run("--root", str(root), "context", "T-0001")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("symlink", result.stdout)
+
+    def test_trust_zone_readmes_are_clone_reproducible(self):
+        for relative in [".agent-workspace/generated/README.md", ".agent-workspace/scratch/README.md", ".agent-workspace/quarantine/README.md"]:
+            path = ROOT / relative
+            self.assertTrue(path.exists(), relative)
+            ignored = subprocess.run(["git", "check-ignore", "-q", relative], cwd=ROOT, check=False)
+            self.assertNotEqual(ignored.returncode, 0, relative)
+
     def test_close_is_dry_run_only(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

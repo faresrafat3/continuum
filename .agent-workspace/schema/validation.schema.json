@@ -36,5 +36,5 @@
     "scope_requirements": {"type": "object"},
     "extensions": {"type": "object"}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }
