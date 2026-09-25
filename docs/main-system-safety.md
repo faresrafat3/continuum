@@ -24,7 +24,7 @@ cordis/agent.cordis.yml    2b8d89c3137ce685f3d97f65aea5bd1c5099e08bba6c168157682
 
 - The custom presets were copied through `agentPresets.copy()` and mount-validated with `agentPresets.standingKeyFor()`.
 - The DSH Host composition, shipped preset files, persistence registry, credentials, and model route were not edited.
-- `hand-3/pkg-12` reports Host `running`, no waiting services, and publishes no services. Its fail-closed guards require goals/jobs visibility, quiescent turn/job state, a non-active goal, child inspection, durable outcome-key caching, and an idempotency key before reporting a fork.
+- `hand-3/pkg-12` reports Host `running`, no waiting services, and publishes no services. Its fail-closed guards require goals/jobs visibility, quiescent turn/job state, a non-active goal, child inspection, process-local outcome-key caching, and an idempotency key before reporting a fork.
 
 ## Known pre-existing condition
 

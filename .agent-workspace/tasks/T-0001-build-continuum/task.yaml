@@ -4,7 +4,7 @@ id: T-0001
 slug: build-continuum
 title: Build Continuum context and session continuity system
 type: feature
-status: validating
+status: done
 priority: p0
 primary_scope: root
 affected_scopes: [root]
@@ -13,7 +13,7 @@ related:
   research: [RES-0001]
   decisions: [ADR-0001]
 created_at: 2026-09-25T00:00:00Z
-updated_at: 2026-09-25T05:45:00Z
-closed_at: null
-outcome: null
+updated_at: 2026-09-25T13:03:14Z
+closed_at: 2026-09-25T13:03:14Z
+outcome: "Safe human-triggered handoff and guarded fork are implemented; automatic archive/delete and deferred crash-boundary automation remain explicitly disabled."
 extensions: {}

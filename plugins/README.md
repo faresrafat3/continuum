@@ -17,4 +17,4 @@ The active process-local package is `hand-3/pkg-12` (`Continuum Handoff + Human 
 
 ## Current verification
 
-`cordis_inspect_self(pluginId="hand-3", packageId="pkg-12")` reports Host `running`, no waiting services, and no published services. The source-level test `node plugins/continuum-handoff.test.mjs` passes, including fail-closed missing-service, running-Session, active-job, paused/active-goal, open-turn, redaction, child identity/workspace/preset, unknown-outcome, inspect-failure, and idempotency guards.
+`cordis_inspect_self(pluginId="hand-3", packageId="pkg-12")` reports Host `running`, no waiting services, and no published services. The source-level test `node plugins/continuum-handoff.test.mjs` passes, including fail-closed missing-service, running-Session, active-job, paused/active-goal, open-turn, redaction, child identity/workspace/preset, process-local outcome-key, inspect-failure, and idempotency guards.
