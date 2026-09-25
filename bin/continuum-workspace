@@ -625,7 +625,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         declared_head = scalar(state, "last_verified_commit") if "last_verified_commit:" in text(state) else None
         if declared_branch and git.get("branch") and declared_branch != git.get("branch"):
             errors.append(f"state branch does not match Git branch in {state.relative_to(root)}")
-        if declared_head and git.get("head") and declared_head != git.get("head"):
+        if declared_head and declared_head not in {"HEAD", "self"} and git.get("head") and declared_head != git.get("head"):
             warnings.append(f"state verified commit is behind current Git HEAD in {state.relative_to(root)}")
         if scalar(state, "working_tree") == "clean" and git.get("status"):
             errors.append(f"state says clean but Git has changes in {state.relative_to(root)}")
