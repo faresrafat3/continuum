@@ -10,6 +10,18 @@ checkpoint:
   commit: null
   tree_state: provisional-dirty
   validation_run_ids: []
+sections:
+  - Objective and acceptance target
+  - Confirmed facts and read set
+  - Completed
+  - Current operation
+  - Exact next action
+  - Decisions/spec/plan changes
+  - Validation evidence
+  - Blockers and questions
+  - Do not repeat / safe shortcuts
+  - Stale or contradictory information
+  - Working tree and uncommitted paths
 ---
 
 # Objective and acceptance target

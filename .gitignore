@@ -3,8 +3,11 @@
 .agent-workspace/scratch/
 .agent-workspace/quarantine/*
 !.agent-workspace/quarantine/README.md
-.agent-workspace/archive/*
-!.agent-workspace/archive/README.md
+
+# Archive is durable terminal history and is versioned.
+
+# Local tool logs
+.crush/
 
 # Python/test residue
 __pycache__/

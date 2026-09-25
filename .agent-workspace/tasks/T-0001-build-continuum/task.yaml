@@ -4,7 +4,7 @@ id: T-0001
 slug: build-continuum
 title: Build Continuum context and session continuity system
 type: feature
-status: in_progress
+status: validating
 priority: p0
 primary_scope: root
 affected_scopes: [root]

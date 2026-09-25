@@ -1,0 +1,15 @@
+schema_version: 1
+kind: Research
+id: RES-0001
+slug: context-engineering-sota
+title: Clean context engineering and durable session recycling
+question: Which evidence-backed patterns should guide Continuum's context, memory, routing, and session continuity design?
+status: verified
+scope_ids: [root]
+related_tasks: [T-0001]
+created_at: 2026-09-25T00:00:00Z
+updated_at: 2026-09-25T06:50:00Z
+review_by: 2027-03-25T00:00:00Z
+method: primary papers, official docs, first-party repositories, local DSH source audit
+limitations: "Framework benchmark numbers are not automatically transferable to DSH; fork-and-seal is a proposed synthesis requiring local crash and recovery tests."
+extensions: {}

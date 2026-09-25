@@ -12,16 +12,23 @@ profiles:
         mutation: false
       - id: unit-tests
         kind: command
-        argv: ["python3", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-v"]
+        argv: ["python3", "-B", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-v"]
         cwd: "."
         timeout_seconds: 120
+        network: false
+        mutation: false
+      - id: plugin-regression
+        kind: command
+        argv: ["node", "plugins/continuum-handoff.test.mjs"]
+        cwd: "."
+        timeout_seconds: 30
         network: false
         mutation: false
   research-links:
     steps:
       - id: citation-scan
         kind: command
-        argv: ["python3", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-p", "test_research.py", "-v"]
+        argv: ["python3", "-B", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-p", "test_research.py", "-v"]
         cwd: "."
         timeout_seconds: 60
         network: false

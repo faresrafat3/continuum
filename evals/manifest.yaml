@@ -1,0 +1,11 @@
+schema: continuum.eval-manifest/v1
+canonical_output: "*/output.md"
+derived_viewer_copy: "*/outputs/output.md"
+review_viewers:
+  - continuum-router/review.html
+  - continuum-handoff/review.html
+  - continuum-research/review.html
+  - continuum-workspace/review.html
+notes:
+  - "output.md is canonical; outputs/output.md is a generated viewer copy."
+  - "Fixture limitations are recorded in each eval metadata/output."

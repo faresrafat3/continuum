@@ -21,5 +21,5 @@ The active task is `T-0001-build-continuum`; read its `spec.md`, `state.yaml`, `
 
 ```sh
 ./bin/continuum-workspace doctor --strict
-python3 -m unittest discover -s .agent-workspace/tests -v
+python3 -B -m unittest discover -s .agent-workspace/tests -v
 ```

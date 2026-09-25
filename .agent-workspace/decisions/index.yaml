@@ -1,0 +1,7 @@
+schema: continuum.generated-index/v1
+kind: DecisionIndex
+updated_at: 2026-09-25T07:00:00Z
+entries:
+  - id: ADR-0001
+    path: ADR-0001-preserve-control-plane.md
+    status: accepted

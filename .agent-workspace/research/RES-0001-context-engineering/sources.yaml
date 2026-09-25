@@ -1,0 +1,100 @@
+sources:
+  - id: S1
+    kind: paper
+    title: "Lost in the Middle: How Language Models Use Long Contexts"
+    publisher: ACL/TACL
+    url: https://aclanthology.org/2024.tacl-1.9/
+    published_at: 2024
+    accessed_at: 2026-09-25
+    locator: "abstract and position-sensitivity findings"
+    confidence: high
+    supports: [C1]
+    limitations: "2023-era model set; not a current ranking."
+  - id: S2
+    kind: paper
+    title: "NoLiMa: Long-Context Evaluation Beyond Literal Matching"
+    publisher: ICML
+    url: https://arxiv.org/abs/2502.05167
+    published_at: 2025
+    accessed_at: 2026-09-25
+    locator: "abstract and 32K stress-test results"
+    confidence: high
+    supports: [C1]
+    limitations: "Synthetic needle setup relies partly on parametric/world knowledge."
+  - id: S3
+    kind: paper
+    title: "Diagnosing and Mitigating Context Rot in Long-horizon Search"
+    publisher: arXiv
+    url: https://arxiv.org/html/2606.29718v2
+    published_at: 2026-08-04
+    accessed_at: 2026-09-25
+    locator: "abstract; sections 3-4"
+    confidence: medium-high
+    supports: [C1, C5]
+    limitations: "Four open models and three search benchmarks; preprint."
+  - id: S4
+    kind: paper
+    title: "Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models"
+    publisher: arXiv
+    url: https://arxiv.org/html/2510.04618v3
+    published_at: 2026-03-29
+    accessed_at: 2026-09-25
+    locator: "abstract; sections 2-4"
+    confidence: medium-high
+    supports: [C5]
+    limitations: "Author-reported benchmark gains; no production safety proof."
+  - id: S5
+    kind: official-docs
+    title: "Persistence and durable execution framework contracts"
+    publisher: LangChain/Temporal/Google ADK/OpenAI/PydanticAI
+    url: https://docs.langchain.com/oss/python/langgraph/persistence
+    published_at: 2026
+    accessed_at: 2026-09-25
+    locator: "persistence/checkpoint/replay/resume sections"
+    confidence: high
+    supports: [C3, C4]
+    limitations: "Framework-specific contracts; not DSH benchmarks."
+  - id: S6
+    kind: paper
+    title: "Rethinking Memory in AI: Taxonomy, Operations, Topics, and Future Directions"
+    publisher: arXiv
+    url: https://arxiv.org/abs/2505.00675
+    published_at: 2025
+    accessed_at: 2026-09-25
+    locator: "taxonomy and six memory operations"
+    confidence: medium-high
+    supports: [C5]
+    limitations: "Survey; rapidly changing area."
+  - id: S7
+    kind: paper
+    title: "Memory Injection Attacks on LLM Agents via Query-Only Interaction"
+    publisher: NeurIPS
+    url: https://arxiv.org/abs/2503.03704
+    published_at: 2025
+    accessed_at: 2026-09-25
+    locator: "attack setup and results"
+    confidence: high
+    supports: [C5]
+    limitations: "Evaluated threat model; not every memory implementation."
+  - id: S8
+    kind: official-docs
+    title: "Spec-driven and worktree-based agent workflows"
+    publisher: GitHub/BMAD/Fission/Git
+    url: https://github.com/github/spec-kit
+    published_at: 2026
+    accessed_at: 2026-09-25
+    locator: "official workflow and worktree documentation"
+    confidence: medium
+    supports: [C6]
+    limitations: "Practitioner guidance, not controlled efficacy evidence."
+  - id: S9
+    kind: paper
+    title: "LLMLingua: Compressing Prompts for Accelerated Inference"
+    publisher: EMNLP
+    url: https://aclanthology.org/2023.emnlp-main.825/
+    published_at: 2023
+    accessed_at: 2026-09-25
+    locator: "compression results and evaluation scope"
+    confidence: high
+    supports: [C2]
+    limitations: "Prompt compression benchmark, not a session handoff guarantee."

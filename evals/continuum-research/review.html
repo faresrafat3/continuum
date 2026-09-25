@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste it back into your agent session.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "continuum-research", "runs": [{"id": "memory-framework-comparison-with-skill", "prompt": "Compare durable agent frameworks and memory systems for a DSH-style local agent. Separate evidence from marketing, cite primary sources, note security and replay trade-offs, and end with a falsifiable experiment.", "eval_id": 0, "outputs": [{"name": "output.md", "type": "text", "content": "# Research: durable agent frameworks and memory systems for a DSH-style local agent\n\n**Decision date:** 2026-09-25  \n**Evidence boundary:** current official documentation, official repositories/releases, and package registries as of 2026-09-25. No framework was benchmarked in DSH in this study.\n\n## Decision summary\n\n### Recommendation\n\n**Keep DSH's own host and permission system as the authority. Add a small, transactional local durability layer\u2014an append-only run/effect journal plus materialized session state\u2014and treat every memory system as a replaceable, derived index.** Do not make an LLM-managed memory database the source of truth for permissions, task state, or tool approvals. This is a **recommendation/inference**, not a vendor-documented guarantee.\n\nFor the current local-agent shape, the decision rule is:\n\n1. **Default now: DSH-native SQLite event/effect ledger.** It is the smallest fit while DSH is one user, one workstation, short-to-medium jobs, and a handful of workers. It keeps storage inspectable and avoids operating another control plane.\n2. **Pilot LangGraph OSS + SQLite if branchable time travel is a first-class product feature.** Its checkpoints and forked histories are unusually good for agent debugging, but replay deliberately re-executes downstream LLM/API/tool nodes, and its default serializer requires a hardening step. \u3010C-002\u3011\n3. **Choose Restate when durable execution becomes a service boundary:** long sleeps, external events/approvals, several languages, or many concurrent invocations. It has a single local binary and a journal model, but the server is Business Source License 1.1 (source-available, not an OSI open-source license) and self-hosted ingress/admin have different security postures. \u3010C-004\u3011\n4. **Choose Temporal when distributed/platform durability, mature worker routing, and operational scale matter more than local minimalism.** It has the strongest documented event-history/versioning model, but deterministic workflow discipline, a separate server, database, UI, and opt-in authorization make it the heaviest local option. \u3010C-003\u3011\n5. **For memory, start with explicit, human-reviewable records and Git/Markdown project artifacts.** Add a semantic index only after retrieval tests justify it. Of the studied systems:\n   - **Letta Code MemFS** is the best studied fit when Git-backed, editable memory and agent-owned skills are desired, but it is a full agent harness rather than a small memory library. Current Letta is materially different from the archived V1 server. \u3010C-005\u3011\n   - **LangMem + a LangGraph Store** is the most composable option for LLM-driven extraction/consolidation, but it remains `0.0.x` and delegates trust, provenance, and curation policy to the application. \u3010C-007\u3011\n   - **Mem0 OSS** is convenient for user-preference extraction and hybrid retrieval. Its current algorithm is ADD-only, so corrected facts remain and ranking\u2014not authoritative replacement\u2014resolves current state. That is risky for project rules and authorization policy. \u3010C-008\u3011\n   - **Graphiti** is appropriate when changing relationships, historical validity, contradiction handling, and fact-to-episode provenance are core. It is much heavier and does not provide the full user/conversation/runtime layer. \u3010C-009\u3011\n\n### What would change the recommendation\n\n- **Temporal** becomes preferred if jobs routinely outlive a workstation restart, cross machines, or require a supported distributed control plane and production persistence.\n- **Restate** becomes preferred over Temporal for a smaller local deployment if a separate single binary, journal-first programming model, and typed signals/awakeables are more valuable than Temporal's larger platform and ecosystem. It is excluded if BSL terms are unacceptable.\n- **LangGraph** becomes preferred if DSH's orchestrator becomes a graph and forkable checkpoint histories outweigh dependency and serialization risk.\n- **Letta MemFS** becomes preferred only if DSH wants to delegate much of the harness, memory lifecycle, and agent-owned skills to Letta\u2014not merely import a memory API.\n- **Graphiti** becomes preferred only if time-varying relationships and provenance are demonstrated requirements, not speculative infrastructure.\n- **Mem0/LangMem automatic writes** are enabled only if adversarial tests show acceptable correction accuracy and no write to trusted policy scope without review.\n\n## Scope and method\n\n### Decision question\n\nWhich durable-agent execution and memory systems should a DSH-style local coding agent use so that work survives process failure without silently duplicating side effects, leaking secrets, accepting poisoned memory, or making replay change the user's files and external state?\n\n### Assumed DSH-style constraints\n\nThis comparison assumes a local, user-owned agent harness that:\n\n- runs on one workstation and can use local files, shell, browser, and model tools;\n- must resume after process or machine restart;\n- may run background workers/subagents and human approval pauses;\n- has non-idempotent effects such as shell commands, file edits, git/network actions, and browser submissions;\n- must remain usable with services and databases offline;\n- should keep human-readable, correctable state;\n- must not trust a retrieved memory string as an authorization decision.\n\nIf these assumptions are wrong, the decision changes materially.\n\n### Inclusion criteria\n\n- Current open-source or source-available framework with a durable execution/checkpoint/replay contract.\n- Current memory framework with an inspectable representation, persistence path, and update/retrieval model.\n- Exact current version or official documentation boundary recorded.\n- Primary evidence only: official docs, source repositories, release metadata, package registries, specifications, or papers.\n\n### Exclusion and negative results\n\n- Hosted-only products were not ranked as local implementations. Zep Cloud, LangSmith Agent Server, Temporal Cloud, Restate Cloud/BYOC, and Mem0 Platform appear only where official OSS documentation explains a boundary.\n- Vendor benchmark numbers were not used to rank local implementations. Mem0 explicitly says its April 2026 scores are for the managed platform with proprietary optimizations and are not expected to match OSS; Graphiti's latency statements are also first-party claims. \u3010C-013\u3011\n- No independent, reproducible head-to-head benchmark was found that compares these systems on local crash recovery, external side-effect duplication, memory poisoning, and operational cost. The recommendation therefore relies on documented semantics and fit, not a synthetic performance score. \u3010C-014\u3011\n\n### Evidence labels\n\n- **[CITED]** \u2014 directly stated by a primary source.\n- **[OBSERVED]** \u2014 registry/repository metadata observed at the stated version/date; not a DSH benchmark.\n- **[INFERRED]** \u2014 a reasoned consequence of cited behavior.\n- **[RECOMMENDED]** \u2014 proposed design or decision rule.\n\n## Source ledger\n\nAll sources were accessed **2026-09-25**. Confidence refers to fitness for the specific claim, not general vendor reliability.\n\n| ID | Primary source and stable locator | Version/date boundary | Kind; confidence | Supports / limitation |\n|---|---|---|---|---|\n| S-LG-01 | LangChain, [Persistence](https://docs.langchain.com/oss/python/langgraph/persistence.md), sections \u201cCheckpointer vs. store\u201d and \u201cMemorySaver does not persist between restarts\u201d | Live docs, 2026-09-25 | Official docs; high for API contract | Checkpoint vs. store scope; SQLite/Postgres choices. Volatile; not independent. |\n| S-LG-02 | LangChain, [Checkpointers](https://docs.langchain.com/oss/python/langgraph/checkpointers.md), \u201cPending writes,\u201d \u201cDurability modes,\u201d \u201cCheckpointer libraries,\u201d \u201cEncryption\u201d | Live docs, 2026-09-25 | Official docs; high | Super-step checkpoints, `exit`/`async`/`sync`, SQLite/Postgres, optional `EncryptedSerializer`. |\n| S-LG-03 | LangChain, [Use time travel](https://docs.langchain.com/oss/python/langgraph/use-time-travel.md), \u201cOverview,\u201d \u201cReplay,\u201d and \u201cFork\u201d | Live docs, 2026-09-25 | Official docs; high | Replay re-executes downstream nodes and LLM/API/interrupt calls; fork is additive. |\n| S-LG-04 | LangGraph package metadata, [`langgraph-checkpoint` PyPI](https://pypi.org/pypi/langgraph-checkpoint/json), \u201cCheckpoint deserialization security\u201d; [`langgraph-checkpoint-sqlite` PyPI](https://pypi.org/pypi/langgraph-checkpoint-sqlite/json), \u201cSecurity\u201d | `langgraph-checkpoint` 4.2.0; SQLite checkpointer 3.1.1 | Registry/package README; high for shipped metadata | Strict msgpack recommendation; SQLite local implementation. Not a vulnerability count. |\n| S-LG-05 | [LangGraph PyPI](https://pypi.org/pypi/langgraph/json) | 1.2.12, uploaded 2026-09-21; MIT | Registry; high for release identity | Current package boundary. Rapidly moving project. |\n| S-TMP-01 | Temporal, [Workflow Execution overview](https://docs.temporal.io/workflow-execution.md), \u201cDurability,\u201d \u201cReliability,\u201d and \u201cReplays\u201d | Live docs, 2026-09-25 | Official docs; high | Event-history replay/recovery semantics. \u201cEffectively once\u201d is a workflow-replay statement, not proof that arbitrary external effects occur once. |\n| S-TMP-02 | Temporal, [Workflow Definition](https://docs.temporal.io/workflow-definition.md), \u201cDeterministic constraints,\u201d \u201cCode changes,\u201d and \u201cVersioning\u201d | Live docs, 2026-09-25 | Official docs; high | AI/LLM/DB calls belong in Activities; replay failures and code-version constraints. |\n| S-TMP-03 | Temporal, [Activities](https://docs.temporal.io/activities.md) | Live docs, 2026-09-25 | Official docs; high | Activities may retry; official recommendation is idempotency. Directly limits exactly-once claims. |\n| S-TMP-04 | Temporal, [Python testing](https://docs.temporal.io/develop/python/best-practices/testing-suite.md), \u201cHow to Replay a Workflow Execution\u201d | Live docs, 2026-09-25 | Official docs; high | CI replay of representative histories and non-determinism errors. |\n| S-TMP-05 | Temporal, [Persistence](https://docs.temporal.io/temporal-service/persistence.md) and [Self-hosted defaults](https://docs.temporal.io/self-hosted-guide/defaults.md) | Live docs, 2026-09-25 | Official docs; high | Append-only history/state; SQLite is dev/test only; history size/count limits. |\n| S-TMP-06 | Temporal, [Self-hosted security](https://docs.temporal.io/self-hosted-guide/security.md), \u201cAuthorizer Plugin\u201d | Live docs, 2026-09-25 | Official docs; high | Without an Authorizer, the default `noopAuthorizer` allows every reachable API request. |\n| S-TMP-07 | Temporal, [Embedded server](https://docs.temporal.io/self-hosted-guide/embedded-server.md), \u201cCaution\u201d and \u201cSQLite limitations\u201d | Live docs, 2026-09-25 | Official docs; high | In-process/SQLite is testing/development only. |\n| S-TMP-08 | Temporal Server [v1.32.0 release](https://github.com/temporalio/temporal/releases/tag/v1.32.0), [LICENSE](https://raw.githubusercontent.com/temporalio/temporal/v1.32.0/LICENSE), and [Python SDK PyPI](https://pypi.org/pypi/temporalio/json) | Server 1.32.0 (2026-09-11), Python SDK 1.33.0; MIT | Official release/registry; high | Version and license boundary. SDK/server versions need compatibility checks. |\n| S-TMP-09 | Temporal Python SDK package documentation, [PyPI README](https://pypi.org/project/temporalio/#workflow-sandbox), sections \u201cExternal Storage,\u201d \u201cWorkflow Sandbox,\u201d \u201cSandbox is not Secure,\u201d and \u201cWorkflow Replay\u201d | Current package README, 2026-09-25 | Official package docs; high for shipped README | External payload storage is experimental; workflow sandbox is a determinism boundary, not hostile-code isolation; replay API. README warns it may track current branch rather than the exact release. |\n| S-RS-01 | Restate, [Key Concepts](https://docs.restate.dev/foundations/key-concepts.md), \u201cDurable Execution\u201d and \u201cConsistent State\u201d | Live docs, 2026-09-25 | Official docs; high for documented model | Journal replay and single-writer K/V state. Product simplicity/exactly-once wording remains a first-party claim. |\n| S-RS-02 | Restate, [Request lifecycle](https://docs.restate.dev/guides/request-lifecycle.md) and [Durable steps](https://docs.restate.dev/develop/python/durable-steps.md) | Live docs, 2026-09-25 | Official docs; high | Journal replay and `ctx.run` semantics. Does not eliminate external-side-effect ambiguity. |\n| S-RS-03 | Restate, [Databases and Restate](https://docs.restate.dev/guides/databases.md), database examples | Live docs, 2026-09-25 | Official docs; high | Explicitly describes a small re-execution window after a DB write succeeds but Restate has not observed completion; shows idempotency-token/2PC patterns. |\n| S-RS-04 | Restate, [Installation](https://docs.restate.dev/installation.md) and [Hosting overview](https://docs.restate.dev/hosting/overview.md) | Live docs, 2026-09-25 | Official docs; high | Single self-contained binary, local data directory, self-hosting. Marketing comparison is not independent evidence. |\n| S-RS-05 | Restate, [Server security](https://docs.restate.dev/server/security.md) | Live docs, 2026-09-25 | Official docs; high | OSS server lacks application auth on management interfaces; ingress/admin/fabric have distinct exposure; headers are journaled. |\n| S-RS-06 | Restate, [Service security](https://docs.restate.dev/services/security.md), \u201cLocking down service access\u201d and \u201cClient-side journal encryption\u201d | Live docs, 2026-09-25 | Official docs; high | Request identity; experimental TypeScript value encryption; metadata/headers remain unencrypted by that codec. |\n| S-RS-07 | Restate Server [v1.7.12 release](https://github.com/restatedev/restate/releases/tag/v1.7.12), [LICENSE](https://raw.githubusercontent.com/restatedev/restate/v1.7.12/LICENSE), [Python SDK PyPI](https://pypi.org/pypi/restate-sdk/json), and [TypeScript SDK npm](https://registry.npmjs.org/@restatedev/restate-sdk/latest) | Server 1.7.12 (2026-09-22), Python SDK 1.0.5, TypeScript SDK 1.17.2 | Official release/license/registry; high | Server uses BSL 1.1 with four-year change date and a public-platform restriction; SDKs are separately licensed (TypeScript is MIT). |\n| S-RS-08 | Restate, [Memory Configuration](https://docs.restate.dev/server/memory.md), \u201cRocksDB Memory\u201d and \u201cRocksDB Memory Architecture\u201d | Live docs, 2026-09-25 | Official docs; high | RocksDB stores durable state, journal entries, log data, and local loglet databases; default memory pools are material to local sizing. |\n| S-LET-01 | Letta, [MemFS](https://docs.letta.com/concepts/memfs.md), \u201cMemory structure,\u201d \u201cVersioning,\u201d and \u201cManaging memory\u201d | Live docs, 2026-09-25 | Official docs; high for current product | Git-backed Markdown memory; `system/` injection; on-demand files; local/cloud repositories. |\n| S-LET-02 | Letta, [current source notice](https://raw.githubusercontent.com/letta-ai/letta/main/README.md) and [Letta Code README](https://raw.githubusercontent.com/letta-ai/letta-code/main/README.md) | Current `main`, 2026-09-25 | Official repo; high | Active code moved to `letta-code`; V1 API server is on `archive`; cloud is default but local backend exists. |\n| S-LET-03 | Letta, [Permissions](https://docs.letta.com/configuration/permissions.md), \u201cPermission modes\u201d and \u201cCross-agent memory guard\u201d | Live docs, 2026-09-25 | Official docs; high | Interactive CLI starts unrestricted; standard/strict modes, persistent allow/deny rules, and cross-agent memory guard. |\n| S-LET-04 | Letta, [Memory & dreaming](https://docs.letta.com/configuration/memory/index.md) | Live docs, 2026-09-25 | Official docs; high | Agent/dreaming updates, commits, reorganization, and optional agent review that does not itself request approval. |\n| S-LET-05 | [Letta PyPI](https://pypi.org/pypi/letta/json) and [npm registry](https://registry.npmjs.org/@letta-ai/letta-code/latest) | 0.33.1, 2026-09-24; Apache-2.0 | Registry; high | Current packaged CLI/version/license. Package is rapidly changing. |\n| S-LM-01 | LangMem, [Core Concepts](https://langchain-ai.github.io/langmem/concepts/conceptual_guide/), \u201cTypes of Memory,\u201d \u201cWriting memories,\u201d and \u201cStorage System\u201d | Live docs, 2026-09-25 | Official docs; high | LLM-driven extraction/consolidation; semantic/episodic/procedural forms; store-agnostic core and LangGraph stateful layer. |\n| S-LM-02 | LangMem, [README](https://raw.githubusercontent.com/langchain-ai/langmem/main/README.md) and [PyPI](https://pypi.org/pypi/langmem/json) | 0.0.30, uploaded 2025-10-27; MIT | Official repo/registry; high | Hot-path tools/background manager and storage boundary. Pre-1.0 and comparatively stale release. |\n| S-MEM-01 | Mem0, [OSS v2-to-v3 migration](https://docs.mem0.ai/migration/oss-v2-to-v3.md), \u201cOverview,\u201d \u201cAdd Calls,\u201d and \u201cHow the New Algorithm Works\u201d | Live docs, 2026-09-25 | Official docs; high | Current ADD-only extraction, old facts retained, hybrid/entity retrieval, graph memory removed from OSS. Breaking and volatile. |\n| S-MEM-02 | Mem0, [OSS overview](https://docs.mem0.ai/open-source/overview.md), [setup](https://docs.mem0.ai/open-source/setup.md), and [configuration](https://docs.mem0.ai/open-source/configuration.md) | Live docs, 2026-09-25 | Official docs; high | Local Qdrant/history defaults, self-host Postgres/pgvector, auth/audit server, provider configurability. Operational defaults may change. |\n| S-MEM-03 | Mem0, [repository README](https://raw.githubusercontent.com/mem0ai/mem0/main/README.md), \u201cNew Memory Algorithm\u201d and benchmark table | `main`, 2026-09-25 | Vendor benchmark/marketing; medium for managed claims, **low for OSS transfer** | Explicitly says scores are managed-platform results with proprietary optimizations and not identical in OSS. |\n| S-GR-01 | Zep/Graphiti, [Graphiti README](https://raw.githubusercontent.com/getzep/graphiti/main/README.md), \u201cWhat is a Context Graph,\u201d \u201cZep vs. Graphiti,\u201d installation, local models, and telemetry | `main`, 2026-09-25 | Official repo; high for OSS architecture, medium for performance claims | Temporal facts/validity, episode provenance, BYO graph DB, no user/conversation management, local model path, opt-out telemetry. |\n| S-GR-02 | [Graphiti Core PyPI](https://pypi.org/pypi/graphiti-core/json) | 0.30.2, uploaded 2026-09-08; Apache-2.0 | Registry; high | Current release/license. Fast-moving extraction pipeline. |\n\n## Findings by claim\n\n### C-001 \u2014 Durable execution and long-term memory are different layers\n\n**[CITED]** LangGraph separates thread checkpoints from cross-thread application-defined stores; Temporal persists workflow commands/events while Activities perform external work; Restate journals context operations and also offers a K/V state layer. \u3010S-LG-01\u3011\u3010S-TMP-01\u3011\u3010S-RS-01\u3011\n\n**[INFERRED]** A durable graph runner can survive process failure without making an automatically extracted \u201cfact\u201d correct or authoritative. DSH should keep run state, policy, and memory as separate stores with explicit links. This separation is the basis of the recommendation.\n\n### C-002 \u2014 LangGraph is the closest lightweight checkpointing candidate, but replay is re-execution\n\n**[CITED]** A checkpointer writes a state snapshot at each graph super-step and per-node pending writes; successful parallel nodes are not rerun after another node fails. `sync` durability writes every checkpoint before the next step, at a performance cost. SQLite is supported as a local checkpointer. \u3010S-LG-02\u3011\n\n**[CITED]** Time travel from a checkpoint re-executes nodes after it, including LLM calls, API requests, and interrupts. A fork creates another checkpoint/history branch; it does not roll back the original. \u3010S-LG-03\u3011\n\n**[CITED]** Checkpoint state is serializable and encryption is optional through `EncryptedSerializer`; separate package guidance says the default serializer allows arbitrary Python types and recommends `LANGGRAPH_STRICT_MSGPACK=true` or an explicit module allow-list to prevent code execution if a checkpoint database is compromised. \u3010S-LG-02\u3011\u3010S-LG-04\u3011\n\n**[INFERRED]** LangGraph is suitable for branching/debugging, not as proof of exactly-once tools. DSH tool nodes need an effect ID and an idempotent boundary. Checkpoint encryption and strict deserialization should be acceptance criteria, not optional hardening.\n\n### C-003 \u2014 Temporal has the most explicit event-history contract and the highest determinism cost\n\n**[CITED]** Temporal recreates workflow state by replaying code and matching emitted commands to durable Event History. A workflow function can execute many times even though the workflow is described as effectively once. \u3010S-TMP-01\u3011\n\n**[CITED]** Workflow code must be deterministic. LLM/AI calls, database queries, and external interactions belong in Activities. Activity attempts are automatically retried, and Temporal explicitly recommends idempotent Activities so retries do not duplicate side effects. Code changes that reorder commands can cause non-determinism errors; the docs prescribe representative-history replay in CI and worker/patching versioning. \u3010S-TMP-02\u3011\u3010S-TMP-03\u3011\u3010S-TMP-04\u3011\n\n**[CITED]** Persistence includes an append-only event-history table. SQLite is supported, but the official embedded-server guide says SQLite/in-memory deployments are for testing/development only. Default history limits can warn or terminate very long histories. \u3010S-TMP-05\u3011\u3010S-TMP-07\u3011\n\n**[CITED]** Self-hosted Temporal has opt-in TLS, claim mapping, and authorization. Without a configured Authorizer, the default `noopAuthorizer` permits every API request reachable on the server. \u3010S-TMP-06\u3011\n\n**[CITED]** The Python SDK's workflow sandbox is explicitly documented as **not a security boundary**; it exists to constrain imports/determinism. External payload storage is also marked experimental. Hostile repository or tool code still requires an OS/process sandbox, and durable payloads/history require normal secret protection. \u3010S-TMP-09\u3011\n\n**[INFERRED]** Temporal is the strongest choice when cross-machine, long-lived, multi-service execution is worth the service/database/authorization complexity. For one local workstation it is over-sized unless DSH expects those semantics soon.\n\n### C-004 \u2014 Restate has a compact journal model, but external exactly-once effects and licensing remain\n\n**[CITED]** Restate records Context operations in an invocation journal, replays the handler on retry, and returns prior results instead of re-running journaled steps. Its request lifecycle documents replay and result reuse. \u3010S-RS-01\u3011\u3010S-RS-02\u3011\n\n**[CITED]** The official database guide is more precise than the headline guarantee: an external database update can succeed and then be re-executed if Restate did not observe completion. It demonstrates idempotency tokens, conditional versions, and optional two-phase commit patterns. \u3010S-RS-03\u3011\n\n**[CITED]** The local server is a single self-contained binary with persistent local data. Self-hosted ingress should sit behind authentication, the admin port must be restricted, and request headers are persisted in the journal. TypeScript client-side value encryption is experimental and does not encrypt all metadata, headers, or failure messages. \u3010S-RS-04\u3011\u3010S-RS-05\u3011\u3010S-RS-06\u3011\n\n**[OBSERVED]** Server 1.7.12 is licensed under BSL 1.1. The license permits internal/local production use but restricts offering a public Restate platform service and changes to Apache-2.0 four years after each release. \u3010S-RS-07\u3011\n\n**[INFERRED]** Restate is a credible scale-up path for a local durable service, especially if Restate-managed calls and signals matter more than a lightweight library. It is not a drop-in \u201cmemory\u201d layer, and DSH should not use a journal claim to bypass tool-level idempotency.\n\n### C-005 \u2014 Current Letta memory is MemFS, not the legacy V1 core/recall/archival model\n\n**[CITED]** Current Letta Code stores long-term memory in an agent-owned Git repository projected as a real checkout. Markdown files under `system/` are injected each turn; other files are discovered/read with ordinary tools. Every edit is versioned by Git. Local-only agents commit to a repository on the current machine and require user-managed backup. \u3010S-LET-01\u3011\n\n**[CITED]** The public `letta` repository says active source moved to `letta-ai/letta-code` and the old V1 API server is retained on the `archive` branch. Current packaged code is Letta Code 0.33.1, not the archived server. \u3010S-LET-02\u3011\u3010S-LET-05\u3011\n\n**[INFERRED]** MemFS is attractive for DSH project conventions and skills because it is inspectable, diffable, and versioned. It also makes memory edits ordinary file writes, so DSH's file permissions, secret filtering, and approval model must cover `$MEMORY_DIR` explicitly.\n\n### C-006 \u2014 Letta's local safety depends on selecting the right mode\n\n**[CITED]** The interactive CLI starts in `unrestricted` mode. `standard` asks before approval-requiring tools, `acceptEdits` allows edits, and `strict` asks before every tool call. A cross-agent memory guard blocks access to other agents' memory directories even in unrestricted mode unless the parent guard is explicitly disabled. \u3010S-LET-03\u3011\n\n**[CITED]** Background dreaming can consolidate memory without interrupting work; \u201cAgent reviews before applying\u201d is an extra model review and does not itself ask the user for approval. \u3010S-LET-04\u3011\n\n**[INFERRED]** Installing Letta without a DSH-specific `standard`/`strict` policy and memory-path guard would widen the local threat surface. The durable memory and durable tools must be governed by the same approval policy.\n\n### C-007 \u2014 LangMem is a curation library, not a trusted memory substrate\n\n**[CITED]** LangMem's core operation prompts an LLM to expand or consolidate current memory state. It distinguishes semantic collections, typed profiles, episodic memories, and procedural instructions, with hot-path agent tools or delayed/background processing. Its stateful layer writes to a LangGraph `BaseStore`; its core functions are storage-agnostic. \u3010S-LM-01\u3011\n\n**[OBSERVED]** The current package is 0.0.30 (last upload 2025-10-27), so API and compatibility risk is higher than for the 1.x execution packages. \u3010S-LM-02\u3011\n\n**[INFERRED]** LangMem is useful for experiments in extraction, consolidation, and prompt refinement. DSH must add source-event IDs, trust levels, content hashes, review status, correction/tombstone semantics, and transactional coupling to the run before using it for project policy.\n\n### C-008 \u2014 Mem0 optimizes retrieval, but current OSS deliberately retains conflicting facts\n\n**[CITED]** Current Mem0 OSS extraction is single-pass and ADD-only: new facts are stored beside old facts; ranking is expected to surface current information. `add()` no longer emits UPDATE/DELETE, and the old graph-store integrations were removed from OSS. Hybrid retrieval combines semantic candidates with BM25/entity boosts. \u3010S-MEM-01\u3011\n\n**[CITED]** The local library defaults to OpenAI for LLM and embeddings, Qdrant under `/tmp/qdrant`, and history in `~/.mem0/history.db`; the self-hosted server defaults to Postgres/pgvector, has authentication enabled by default, and offers API keys plus request audit logs. Configurable providers include Ollama and local-compatible models. \u3010S-MEM-02\u3011\n\n**[CITED]** Mem0's April 2026 benchmark says the reported scores come from the managed platform, include proprietary optimizations, and should not be expected to match OSS. \u3010S-MEM-03\u3011\n\n**[INFERRED]** ADD-only semantics are reasonable for immutable observations with temporal ranking but dangerous for mutable rules such as \u201ctests must use pnpm.\u201d DSH should never let Mem0 memory authorize tools or overwrite a canonical policy record without an explicit supersession workflow.\n\n### C-009 \u2014 Graphiti provides temporal fact lineage, not durable agent execution\n\n**[CITED]** Graphiti represents entities, facts/relationships with validity windows, and episodes as raw provenance. New facts can invalidate old facts while preserving history; incremental ingestion and hybrid semantic/keyword/graph retrieval avoid requiring full graph recomputation. \u3010S-GR-01\u3011\n\n**[CITED]** Graphiti requires a graph database (or supported local backend), defaults LLM/embedding work to OpenAI, and documents a fully local Ollama-compatible path. Its OSS comparison explicitly says user/conversation management and turnkey governance are the developer's responsibility. Telemetry is opt-out and documented as excluding graph content. \u3010S-GR-01\u3011\n\n**[INFERRED]** Graphiti is valuable when memory questions are relationship/time/provenance questions, not when the only need is \u201cretrieve the latest project convention.\u201d Its LLM extraction, graph database, and derived-summary invalidation add cost and another security boundary. It has no run-level deterministic replay.\n\n### C-010 \u2014 None of the studied systems provides magical exactly-once external side effects\n\n**[CITED]** Temporal retries Activities and asks for idempotency. \u3010S-TMP-03\u3011 LangGraph time travel re-fires API calls. \u3010S-LG-03\u3011 Restate's own database guide documents the success-without-observation retry window. \u3010S-RS-03\u3011\n\n**[INFERRED]** DSH must implement an **effect protocol** even if it adopts one of these runtimes:\n\n- allocate a stable `effect_id` before execution;\n- bind it to run, tool, normalized arguments, workspace, policy version, and attempt;\n- pass it to an idempotent sink or record it transactionally with the sink;\n- persist `prepared`, `executing`, `succeeded`, `failed`, and `unknown` states;\n- on `unknown`, reconcile with the sink instead of blindly retrying;\n- make approval single-use and invalid if arguments, workspace, plugin version, or policy changes.\n\n### C-011 \u2014 Checkpoint replay does not automatically roll memory back\n\n**[CITED]** LangGraph checkpoint time travel branches execution state; Temporal replay reconstructs workflow state from Event History; Restate replays journaled context operations. \u3010S-LG-03\u3011\u3010S-TMP-01\u3011\u3010S-RS-02\u3011 None of those source contracts says an independently written LangGraph Store, Mem0 record, MemFS commit, or Graphiti ingestion is part of the same rollback transaction.\n\n**[INFERRED]** Replaying an agent can re-run a memory-write tool and mutate derived memory twice or in a different order. DSH should either:\n\n1. make memory writes content-addressed and idempotent;\n2. store `source_run_id`/`source_event_id` and deduplicate on replay;\n3. write untrusted candidate memory first and promote it only after the run commits; or\n4. keep memory writes outside replay and branch them explicitly.\n\n### C-012 \u2014 Persisted prompts, headers, tool output, and memory are secret-bearing stores\n\n**[CITED]** Restate states that ingress HTTP headers are journaled and recommends stripping infrastructure auth headers before Restate. \u3010S-RS-05\u3011 LangGraph checkpoints may contain full graph state and support an encrypted serializer. \u3010S-LG-02\u3011 Temporal supports payload codecs for data encryption, while authorization is separately opt-in. \u3010S-TMP-06\u3011 Mem0's self-host server has auth/audit but library mode has no API-key layer. \u3010S-MEM-02\u3011\n\n**[INFERRED]** Security review must cover the persistence layer, not merely the model prompt. Minimum controls are encrypted transport, encrypted or redacted values at rest, secret-pattern redaction before checkpoints, OS user separation, restrictive file/database permissions, bounded retention, export/delete, and redacted diagnostics.\n\n### C-013 \u2014 Vendor evidence supports mechanisms, not universal performance or superiority\n\n**[CITED]** Mem0's own README limits transfer of its managed benchmark to OSS. \u3010S-MEM-03\u3011 Restate's and Graphiti's simplicity/latency language is first-party product material; their detailed lifecycle, database, and security caveats are more decision-relevant than the headline claims. \u3010S-RS-02\u3011\u3010S-RS-03\u3011\u3010S-GR-01\u3011\n\n**[RECOMMENDED]** Do not put vendor benchmark numbers in an ADR's selection rationale unless the exact OSS version, configuration, model, task set, baseline, raw outputs, and independent reproduction are available.\n\n### C-014 \u2014 No adequate independent head-to-head evidence was found\n\n**[OBSERVED]** The primary sources document mechanisms and self-reported results, but this study found no independent benchmark that jointly measures local crash recovery, replayed side effects, secret retention, poisoned-memory resistance, and operator effort for the current versions.\n\n**[INFERRED]** The decision has lower confidence on performance/operational cost and higher confidence on semantic boundaries. The final experiment is therefore mandatory before a framework becomes the DSH default.\n\n## Framework and memory matrices\n\n### Durable execution frameworks\n\n| Criterion | DSH-native ledger (recommended baseline) | LangGraph OSS 1.2.12 | Temporal Server 1.32.0 / Python 1.33.0 | Restate Server 1.7.12 / Python 1.0.5 |\n|---|---|---|---|---|\n| Primary abstraction | Append-only events + session/effect tables | Graph super-steps and state channels | Deterministic Workflow + Event History + Activities | Handler invocation journal + K/V objects/workflows |\n| Local persistence | SQLite/file store controlled by DSH | Pluggable; SQLite or Postgres \u3010S-LG-02\u3011 | Separate server; SQLite explicitly dev/test only \u3010S-TMP-05\u3011\u3010S-TMP-07\u3011 | Single binary; RocksDB backs state, journals, logs, and local loglets \u3010S-RS-04\u3011\u3010S-RS-08\u3011 |\n| Crash resume | Must be implemented against a declared commit/effect protocol | Restores checkpoint; failed nodes/pending writes modeled \u3010S-LG-02\u3011 | Replays workflow code against Event History \u3010S-TMP-01\u3011 | Replays journal; prior results supplied to handler \u3010S-RS-01\u3011\u3010S-RS-02\u3011 |\n| Time travel/fork | Custom; natural if event log is immutable | First-class replay and additive fork; downstream effects rerun \u3010S-LG-03\u3011 | Offline history replay; execution reset/versioning semantics differ from branch UX \u3010S-TMP-04\u3011 | Inspectable journal and invocation restart APIs; not the same as source-level branch UX \u3010S-RS-02\u3011 |\n| Human pause/resume | Native DSH control | `interrupt` + checkpointer | Signals/Updates/Activities | Signals, awakeables, workflow promises \u3010S-RS-02\u3011 |\n| Long waits/many workers | Custom scheduler | Possible, but graph/runtime is the concern | Strong documented fit | Strong documented fit; smaller service model |\n| External side effects | Custom effect protocol | Idempotent tool boundary required; replay fires calls \u3010S-LG-03\u3011 | Activities may retry; idempotency required \u3010S-TMP-03\u3011 | Restate-managed calls dedupe; external DB effect window remains \u3010S-RS-03\u3011 |\n| Memory | Keep separate/derived | Checkpoint store separate; LangMem optional \u3010S-LG-01\u3011 | Payload/history separate from app DB | K/V state can hold context but is execution state, not curated memory |\n| Security default | DSH must implement | Optional encryption; strict msgpack recommended; SQLite file security still required \u3010S-LG-02\u3011\u3010S-LG-04\u3011 | Default `noopAuthorizer` allows all reachable APIs; configure auth/TLS/codecs \u3010S-TMP-06\u3011 | OSS server management auth is external; separate ingress/admin/fabric; headers journaled \u3010S-RS-05\u3011 |\n| Operational cost for one local agent | Lowest if kept small | Low-to-medium library integration | Highest: server, DB, UI, versioning, auth, upgrades | Medium: separate binary/service, SDK discipline, ports; BSL review \u3010S-RS-04\u3011\u3010S-RS-07\u3011 |\n| License | DSH-owned | MIT \u3010S-LG-05\u3011 | MIT server/SDK boundary \u3010S-TMP-08\u3011 | BSL 1.1 server; SDK license should be checked separately \u3010S-RS-07\u3011 |\n| Evidence confidence | High on design logic; unmeasured implementation | High on documented semantics | High on documented semantics | High on lifecycle/security; lower on external-effect and product claims |\n| DSH fit | **Default** | **Pilot if graph/time travel is needed** | **Scale/distributed path** | **Local durable-service path** |\n\n### Memory systems\n\n| Criterion | Explicit Git/SQLite records (recommended baseline) | Letta Code 0.33.1 MemFS | LangMem 0.0.30 + Store | Mem0 OSS 2.2.0 | Graphiti 0.30.2 |\n|---|---|---|---|---|---|\n| Representation | Canonical typed records plus Git/Markdown artifacts | Agent-owned Git repo; Markdown + YAML frontmatter; file tree | Semantic items/profiles, episodes, instructions, or prompt text in a `BaseStore` | Extracted facts in vector/history stores; entity matching | Entities, temporal facts/edges, episodes, optional ontology |\n| Who writes | DSH policy + reviewed agent candidates | Agent/dreaming using ordinary file tools; commits to Git | Agent tool in hot path or LLM manager in background | LLM extraction from conversation | LLM structured extraction/deduplication from episodes |\n| Update/curation | Explicit supersede/tombstone/review workflow | Git diff, commit, backup, reorg; dreaming consolidation | Prompted insert/update/delete/consolidate transforms | Current OSS ADD-only; new facts coexist with old facts \u3010S-MEM-01\u3011 | New facts invalidate edges while preserving history/provenance \u3010S-GR-01\u3011 |\n| Retrieval | Exact IDs, recency, FTS/vector added later | `system/` always injected; other files by search/read tools | Direct, semantic, metadata search through store \u3010S-LM-01\u3011 | Semantic + optional BM25/entity boosts \u3010S-MEM-01\u3011 | Semantic + keyword + graph traversal/time-aware queries |\n| Provenance/versioning | First-class fields and event links | Git commit history | Application-defined; not automatic in core docs | Metadata/history exist, but no run-level replay contract | Episode lineage and fact validity windows are strongest here |\n| Local operation | Best; no extra service | Local Git checkout; user backs up local agents \u3010S-LET-01\u3011 | Storage-agnostic; depends on chosen store | Local Qdrant/history, but defaults call hosted OpenAI; Ollama configurable \u3010S-MEM-02\u3011 | Local graph DB plus local or hosted models; much heavier \u3010S-GR-01\u3011 |\n| Security default | DSH-controlled | Interactive CLI starts unrestricted; memory guard exists \u3010S-LET-03\u3011 | No agent auth; app owns store/namespace/tool policy | Library has no API auth; self-host server auth on by default \u3010S-MEM-02\u3011 | Library has no user/conversation management; DB/model endpoints are the boundary |\n| Poisoning exposure | Low if trusted/untrusted scopes and review enforced | High: `system/` persists and is injected every turn | High if the agent can write trusted policy items | High if corrected/hostile facts accumulate and rank well | High if raw episodes or extracted edges are accepted as trusted facts |\n| Deletion/retention | Explicit and auditable | Git history retains deleted content unless history rewritten/purged | Store-specific | ADD-only current data requires supersession/tombstone design; entity cascade exists in server | \u201cInvalidate, do not delete\u201d preserves old facts and episodes by design |\n| Replay relationship | Explicitly couple candidates to source event | Git commit is not run rollback | Store writes are not automatically checkpointed | Memory writes are not automatically run rollback | Temporal facts are not run replay |\n| Best DSH use | Canonical preferences, task status, project rules, provenance | Editable agent identity/skills/project memory with Git review | Experimental extraction/curation adapter | User-preference/observation retrieval where stale ranking is acceptable | Relationship/time/provenance-heavy knowledge |\n| Recommendation | **Default source of truth** | **Good opt-in harness/memory model** | **Pilot behind adapter** | **Derived preference index only** | **Specialized temporal graph only** |\n\n## Security and replay trade-offs\n\n### Threat model\n\n1. **Crash window:** a tool succeeds, but DSH dies before recording success.\n2. **Duplicate replay:** a checkpoint fork, Activity retry, or journal replay invokes the tool again.\n3. **Authorization drift:** a historical approval is replayed after tool code, arguments, workspace, or policy changed.\n4. **Secret persistence:** prompts, environment dumps, HTTP headers, tool output, traces, checkpoints, and memory retain credentials.\n5. **Memory poisoning:** untrusted web/file/tool content becomes a durable instruction or project fact.\n6. **Tenant/scope escape:** user, agent, project, or shared-memory filters are treated as authorization when they are only query selectors.\n7. **Stale memory:** old facts continue to influence behavior after correction or deletion.\n8. **Retention failure:** deleting a chat does not delete derived vectors, graph edges, backups, Git objects, traces, or model-provider logs.\n\n### Required controls independent of framework\n\n- **Authorization at the effect boundary:** DSH checks current policy immediately before executing; a checkpoint never grants permission.\n- **Approval binding:** approval record includes normalized tool arguments hash, path/workspace, plugin version, policy version, approver, expiry, and one-time effect ID.\n- **Idempotency/uncertainty:** `unknown` is a first-class outcome; reconcile before retrying non-idempotent effects.\n- **Trust-scoped memory:** candidate observations cannot enter `system/`, policy, permissions, or tool definitions. Promote only through an explicit review rule.\n- **Provenance:** every derived item records source event/run/tool, creation time, content hash, writer identity, trust, and supersession/tombstone links.\n- **Secret minimization:** structured environment reads are allowlisted; checkpoint serializers redact or encrypt; journals do not receive proxy auth headers; raw tool output is size-bounded.\n- **Least privilege:** local DB/Git directories are user-only; servers bind to loopback; Temporal Authorizer, Restate ingress/admin controls, and Mem0 server auth are enabled if those servers are used.\n- **Deletability:** canonical delete emits a tombstone, rebuilds derived indexes, prunes histories where possible, and documents what cannot be erased (Git objects/backups/provider retention).\n- **Branch isolation:** a replay/fork writes candidate state under a branch ID; it does not silently update global `system/` memory.\n\n## Contradictions and unknowns\n\n1. **\u201cExactly once\u201d is scope-dependent.** Restate's managed communication and K/V state are strongly journaled, but its own DB examples expose an external-effect retry window. Temporal protects workflow sequencing but Activities can duplicate. LangGraph preserves pending writes but time travel re-fires calls. Treat exactly-once as a property of a bounded protocol, not a framework adjective. \u3010C-010\u3011\n2. **Durability mode is not effect durability.** LangGraph `sync` controls checkpoint persistence before the next step; it does not atomically commit an external API and checkpoint. \u3010C-002\u3011\n3. **Long-term memory is not run state.** Even a git-backed memory repository is not an execution log, and a vector store is not a permission system. \u3010C-001\u3011\u3010C-011\u3011\n4. **Letta naming/version drift is material.** Older examples of core/recall/archival memory describe archived V1, while current Letta Code uses MemFS. Any comparison that does not name the branch/package is stale. \u3010C-005\u3011\n5. **Mem0's benchmark is not OSS evidence.** The vendor itself limits transfer of its 2026 numbers. \u3010C-013\u3011\n6. **Graphiti's provenance is derived provenance.** Episode lineage is valuable, but extracted entities/edges and evolving summaries still depend on LLM extraction; raw episode review may be necessary.\n7. **Shared namespaces/filters are not proven authorization boundaries.** Mem0 filters, LangMem namespaces, and Graphiti group IDs organize data but require a separate auth design. This is an inference, not a claim that those products have an isolation vulnerability.\n8. **Local encryption varies.** LangGraph and Temporal provide value-encryption mechanisms; Restate's current value codec is TypeScript-only and excludes some metadata. Mem0 and Graphiti inherit security from their database/server/model providers. Letta Git memory has no source found here that establishes application-level encryption-at-rest.\n9. **Operational cost is unmeasured.** No primary source or local experiment establishes DSH-specific install size, cold-start time, migration time, disk growth, or upgrade burden.\n10. **Language/package parity still needs a pinned spike.** The detailed durability evidence above is primarily from Python packages/docs; DSH is Node-based. Restate's current TypeScript SDK is 1.17.2, but equivalent exact behavior, serde, versioning, and security defaults must be rechecked in the selected LangGraph and Temporal JavaScript packages before adoption. \u3010S-RS-07\u3011\n11. **Rapid release cadence changes conclusions.** LangMem is pre-1.0; Letta, Mem0, and Graphiti changed materially in 2026; Restate changed license posture and SDK compatibility. Pin versions and re-run the experiment on upgrade.\n\n## Recommendation and trade-offs\n\n### Recommended DSH architecture\n\n```text\nHuman / web client\n       |\nDSH host policy and approval boundary\n       |\nappend-only run events  ----> materialized session/task state\n       |                              (SQLite)\n       |\neffect ledger (effect_id, args hash, policy hash, status)\n       |\nidempotent tool adapters / sandbox / local model router\n       |\ncandidate memory records (provenance, trust, review status)\n       |\noptional derived indexes: FTS/vector (LangMem/Mem0) or temporal graph (Graphiti)\n       |\noptional opt-in Git/Markdown agent memory (Letta-style MemFS)\n```\n\n### Non-negotiable semantics\n\n- The run event log and effect ledger are canonical.\n- Checkpoints may be caches/materialized views; they must be rebuildable from canonical records or explicitly versioned.\n- Memory facts cannot authorize tools, expand filesystem scope, or bypass approval.\n- An LLM call is an effect: record request metadata and result reference; do not blindly replay a billable call.\n- A fork/replay uses a branch namespace and does not mutate trusted global memory until promoted.\n- Deletes propagate to active derived indexes; immutable audit records use tombstones/redaction according to retention policy.\n\n### Why not one framework end-to-end?\n\n- **Temporal/Restate solve durable orchestration, not trustworthy memory curation.** Coupling both to one memory vendor would make a reversible local adapter expensive.\n- **LangGraph is attractive but duplicates DSH orchestration if DSH already owns a graph/runtime.** Adopt it for a bounded workflow or experiment, not by reflex.\n- **Letta Code is a harness choice, not a drop-in library choice.** Its permissions, memory, subagents, UI, and self-modification model must align with DSH before adoption.\n- **Mem0/LangMem are LLM transformation layers.** They can propose changes but should not be the final authority.\n- **Graphiti is a specialized data model.** It earns its cost only if temporal relationship queries and provenance are real requirements.\n\n### Reversible adoption sequence\n\n1. Implement and test the DSH-native event/effect contract.\n2. Put memory behind a narrow interface: `propose`, `search`, `promote`, `supersede`, `delete`, `export`.\n3. Add a read-only FTS/vector adapter and measure whether it beats exact/tag search.\n4. Pilot LangGraph on one interruptible workflow; compare with Temporal/Restate only if the workload crosses the local/distributed boundary.\n5. Treat any memory vendor as replaceable until retention, correction, poisoning, and export tests pass.\n\n## Freshness and review triggers\n\nReview this report when any of the following occurs:\n\n- LangGraph moves from `1.2.x`, changes `BaseCheckpointSaver`, strict-msgpack defaults, or time-travel semantics.\n- Temporal changes Event History, Worker Versioning, default authorization, persistence guidance, or local CLI behavior.\n- Restate changes BSL terms, journal format, SDK 1.x compatibility, encryption support, or default local ports/security.\n- Letta changes MemFS layout, default backend/permission mode, or retires/renames the archived V1 model.\n- LangMem reaches 1.0 or changes manager/store contracts.\n- Mem0 changes ADD-only behavior, restores graph support to OSS, or changes default providers/auth.\n- Graphiti changes episode/fact lineage, supported local graph backends, or default telemetry/model behavior.\n- A DSH incident shows duplicate effects, secret retention, cross-agent memory access, or stale-memory behavior.\n- The experiment below is run and produces a result that changes the recommendation.\n\n## Falsifiable experiment\n\n### Question\n\nDoes the recommended DSH-native ledger plus explicit memory materially underperform a durable framework or an automatic memory adapter on the failure modes that matter for a local coding agent?\n\n### Pre-registered hypothesis\n\n**H1:** With identical tool semantics, DSH-native SQLite plus an effect ledger will match durable-framework crash recovery and require less integration code.  \n**H2:** Explicit, reviewed memory will have better correction accuracy and policy-write safety than automatic LangMem/Mem0 memory, with a recall advantage no larger than 10 percentage points.  \n**H3:** No framework arm will achieve zero duplicate observable effects unless every sink implements the same effect-ID idempotency protocol.\n\n### Arms\n\n**Durability bake-off (same deterministic fake model, same tools, same tests):**\n\n- A: DSH-native SQLite event/effect ledger.\n- B: LangGraph 1.2.12 + `langgraph-checkpoint-sqlite` 3.1.1, `durability=\"sync\"`, strict msgpack, encrypted serializer.\n- C: Temporal Server 1.32.0 + Python SDK 1.33.0 local service.\n- D: Restate Server 1.7.12 + Python SDK 1.0.5 local service.\n\n**Memory bake-off (same fixed local model and embeddings):**\n\n- M1: explicit typed SQLite/Git records with review and supersession.\n- M2: LangMem 0.0.30 + the same local store.\n- M3: Mem0 OSS 2.2.0 with local Qdrant/history and local model/embedding endpoints.\n\nRun the same adapters twice: once with the tool sink enforcing `effect_id`, once with a deliberately non-idempotent sink. This makes the exactly-once boundary visible instead of hiding it behind framework marketing.\n\n### Workload\n\nCreate a fixed harness with:\n\n- 20 ordinary multi-tool tasks;\n- 20 tasks with a human approval pause;\n- 20 tasks with two parallel branches and a merge;\n- 20 correction tasks where a project fact changes;\n- 20 adversarial memory episodes containing prompt-injection text from a \u201crepository issue,\u201d web page, and tool result;\n- one synthetic canary secret in each transcript, environment result, HTTP header class, and memory candidate.\n\nUse fixed model output or a recorded local model seed so framework re-execution does not introduce model-quality noise. Do not change prompts between arms.\n\n### Fault injection\n\nFor each durability task, kill the worker at seven predefined points:\n\n1. before a tool call;\n2. after sink success but before success is journaled;\n3. after checkpoint write but before the next node;\n4. after one parallel branch succeeds and the other fails;\n5. after human approval but before resume;\n6. during LLM/tool timeout retry;\n7. during process startup before recovery completes.\n\nRepeat each point/task combination three times with recorded seeds. Separately test a code upgrade between checkpoint creation and resume.\n\n### Metrics and thresholds\n\n**Durability decision passes only if all are met:**\n\n- 100% terminal-state equivalence to the fault-free reference run;\n- 0 unauthorized tool executions and 0 approvals accepted after argument/policy/plugin hash change;\n- 0 canary-secret values in unencrypted checkpoints, journals, traces, or memory indexes;\n- 0 duplicate observable sink effects when the sink enforces the documented `effect_id` protocol;\n- p95 recovery time no more than 2\u00d7 the no-fault run;\n- operator-visible recovery commands and integration code recorded, not estimated.\n\n**Memory decision passes only if all are met:**\n\n- canonical fact precision \u22650.95 and exact correction accuracy \u22650.90;\n- cross-session recall \u22650.90;\n- 100% of poisoned instructions quarantined from trusted policy/system scope;\n- 100% of requested deletions absent from active derived indexes within 5 seconds;\n- provenance present for 100% of candidate/promoted memory;\n- no canary secret retained in active memory or embeddings.\n\n### Pre-registered interpretation\n\n- **Falsify the native-first durability recommendation** if Temporal, Restate, or LangGraph has zero correctness/security failures, p95 recovery at least 50% faster, and can meet the integration-complexity budget without adding a mandatory always-on service for the local-only workload. Adopt the winner behind the same DSH adapter.\n- **Falsify the explicit-memory recommendation** if LangMem or Mem0 improves cross-session recall by at least 10 percentage points while correction accuracy falls by no more than 2 points, trusted-policy writes remain zero, and deletion/provenance tests pass.\n- **Falsify every \u201cexactly once by framework\u201d claim** if any framework duplicates an effect after a sink succeeds but before the framework records success, even when the sink lacks idempotency.\n- **Do not adopt a system that fails a security threshold to win latency or recall.** A failed secret, authorization, or poison-containment threshold is disqualifying regardless of aggregate score.\n- Report raw runs, exact package hashes, model/embedding identifiers, configuration, disk growth, cold start, recovery time, and all failures. A single favorable average cannot override a pre-registered hard security or correctness failure.\n"}], "grading": {"expectations": [{"text": "keeps DSH Host/permission system authoritative and treats memory indexes as derived", "passed": true, "evidence": "Decision summary recommends DSH-native append-only state and replaceable derived indexes."}, {"text": "compares durable frameworks and memory systems with primary-source evidence and version boundaries", "passed": true, "evidence": "The 32-row source ledger and framework/memory matrices include versions, licenses, and limitations."}, {"text": "ends with a falsifiable crash/replay and memory-poisoning experiment", "passed": true, "evidence": "The final section pre-registers workload, fault injection, security thresholds, and falsification criteria."}]}}], "previous_feedback": {}, "previous_outputs": {}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

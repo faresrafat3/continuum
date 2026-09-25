@@ -1,0 +1,7 @@
+schema: continuum.generated-index/v1
+kind: ResearchIndex
+updated_at: 2026-09-25T07:00:00Z
+entries:
+  - id: RES-0001
+    path: RES-0001-context-engineering/research.yaml
+    status: verified

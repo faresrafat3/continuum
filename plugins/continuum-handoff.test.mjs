@@ -11,10 +11,15 @@ globalThis.harness = {
 }
 
 const { default: createPlugin } = await import('./continuum-handoff.js')
+let jobRows = []
+let goalView
+let forkCalls = 0
+let missingServices = false
 const ctx = {
   get(name) {
-    if (name === 'goals') return { get() { return undefined } }
-    if (name === 'jobs') return { list() { return [] } }
+    if (missingServices) return undefined
+    if (name === 'goals') return { get() { return goalView } }
+    if (name === 'jobs') return { list() { return jobRows } }
     return undefined
   },
   effect(effect) {
@@ -34,10 +39,16 @@ const ctx = {
     }
   },
   sessionController: {
-    async fork() { return { sessionId: 'child-session' } }
+    async fork() {
+      forkCalls += 1
+      await new Promise(resolve => setTimeout(resolve, 5))
+      return { sessionId: 'child-session' }
+    },
+    async inspect(id) { return { meta: { id: String(id) } } }
   }
 }
 
+let openTurn = false
 const agent = {
   id: 'source-session',
   status: 'idle',
@@ -45,12 +56,14 @@ const agent = {
     seq: 7,
     header: { id: 'source-session', cwd: '/tmp/example', agentPreset: 'continuum' },
     ownEvents() {
-      return [
+      const events = [
         { type: 'user/message', time: 1, data: { message: { content: [{ type: 'text', text: 'finish the safe slice' }] } } },
         { type: 'turn/start', time: 2, data: { turn: 1 } },
         { type: 'turn/end', time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
         { type: 'assistant/message', time: 4, data: { message: { content: [{ type: 'text', text: 'verified result' }] } } }
       ]
+      if (openTurn) events.push({ type: 'turn/start', time: 5, data: { turn: 2 } })
+      return events
     }
   }
 }
@@ -65,6 +78,9 @@ assert.equal(preview.archiveAllowed, false)
 assert.equal(preview.parentRetained, true)
 assert.match(preview.prompt, /@\[source-session\]/)
 assert.match(preview.prompt, /T-0001/)
+const redactedPreview = JSON.parse(registeredTool.execute({ taskId: 'T-0001', objective: 'client_secret=supersecret', note: 'Authorization: Bearer abcdefghijklmnop' }, { agent }))
+assert.ok(!JSON.stringify(redactedPreview).includes('supersecret'))
+assert.ok(!JSON.stringify(redactedPreview).includes('abcdefghijklmnop'))
 
 const handoff = commands.get('continuum-handoff')
 assert.ok(handoff)
@@ -78,6 +94,43 @@ const forkResult = await fork.handler({ agent, rawInput: ' T-0001 ' })
 assert.equal(forkResult.kind, 'success')
 assert.match(forkResult.text, /child-session/)
 assert.match(forkResult.text, /Parent retained/)
+
+const concurrent = await Promise.all([
+  fork.handler({ agent, rawInput: ' T-0002 ' }),
+  fork.handler({ agent, rawInput: ' T-0002 ' })
+])
+assert.equal(concurrent.filter(result => result.kind === 'success').length, 1)
+assert.equal(concurrent.filter(result => result.kind === 'error').length, 1)
+assert.equal(forkCalls, 2)
+const idempotent = await fork.handler({ agent, rawInput: ' T-0002 ' })
+assert.equal(idempotent.kind, 'success')
+assert.match(idempotent.text, /Idempotent replay/)
+assert.equal(forkCalls, 2)
+
+jobRows = [{ id: 'job-1', kind: 'test', status: 'running' }]
+const jobBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
+assert.equal(jobBlocked.kind, 'error')
+assert.match(jobBlocked.text, /background jobs/)
+jobRows = []
+goalView = { phase: 'active', objective: 'do work', roundsStarted: 1, maxGoalRounds: 3 }
+const goalBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
+assert.equal(goalBlocked.kind, 'error')
+assert.match(goalBlocked.text, /goal is active/)
+goalView = { phase: 'paused', objective: 'do work', roundsStarted: 1, maxGoalRounds: 3 }
+const pausedBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
+assert.equal(pausedBlocked.kind, 'error')
+assert.match(pausedBlocked.text, /goal is paused/)
+goalView = undefined
+openTurn = true
+const turnBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
+assert.equal(turnBlocked.kind, 'error')
+assert.match(turnBlocked.text, /turn is open/)
+openTurn = false
+missingServices = true
+const missingBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
+assert.equal(missingBlocked.kind, 'error')
+assert.match(missingBlocked.text, /missing required services/)
+missingServices = false
 
 agent.status = 'running'
 const blocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
