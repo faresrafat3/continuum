@@ -16,7 +16,7 @@ execution:
   branch: main
   worktree: null
   started_from_commit: 0d2424f32425cd05cb954111c08ce11d3c849167
-last_verified_commit: 158ba435f2865fe0d4d085a5eeebda7fd2a508c7
+last_verified_commit: 1e50443f0ae0376e5ba076c694ab1d01a9f5a397
 working_tree: clean
 dirty_paths: []
 validation:
@@ -29,4 +29,4 @@ assumptions:
   - "The DSH Host/Main System is the control plane and must remain unchanged."
   - "Deferred crash/approval/tool-boundary gates are explicitly recorded in docs/acceptance-matrix.md and do not enable unattended recycling."
 extensions:
-  code_checkpoint: 158ba435f2865fe0d4d085a5eeebda7fd2a508c7
+  code_checkpoint: 1e50443f0ae0376e5ba076c694ab1d01a9f5a397

@@ -23,7 +23,7 @@ The project does not modify that checkout, its Host composition, shipped preset 
 ## Checkpoints
 
 - Initial nested checkpoint: `0d2424f32425cd05cb954111c08ce11d3c849167`
-- Final nested checkpoint: `27d795111b87fac9a5232d47baf592a6fc27f5ba` (`fix: close schema, archive, and clean-clone gaps`).
-- State binds its last verified code checkpoint to `158ba435f2865fe0d4d085a5eeebda7fd2a508c7`, an ancestor of the final metadata commit; `HEAD` is verified clean after closure.
+- Final nested checkpoint: `1e50443f0ae0376e5ba076c694ab1d01a9f5a397` (`fix: finalize strict runtime and WCS conformance`).
+- State binds its last verified code checkpoint to `1e50443f0ae0376e5ba076c694ab1d01a9f5a397`; the final metadata commit follows this code checkpoint.
 
 Dynamic DSH package `hand-3/pkg-14` is process-local and is intentionally not part of the nested Git commit. Its exact source is retained at `plugins/continuum-handoff.js` and can be recovered with `cordis_inspect_self`.
