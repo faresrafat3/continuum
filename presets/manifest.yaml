@@ -1,0 +1,11 @@
+schema: continuum.preset-archive/v1
+presets:
+  - id: continuum
+    installed_path: /home/fares/.dsh/.agent-presets/continuum
+    source_path: presets/continuum
+    mount_check: "agentPresets.standingKeyFor('continuum') passed"
+  - id: continuum-curator
+    installed_path: /home/fares/.dsh/.agent-presets/continuum-curator
+    source_path: presets/continuum-curator
+    mount_check: "agentPresets.standingKeyFor('continuum-curator') passed"
+protected: [standard, cordis, host-composition, persistence]
