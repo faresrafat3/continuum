@@ -44,7 +44,7 @@ const ctx = {
       await new Promise(resolve => setTimeout(resolve, 5))
       return { sessionId: 'child-session' }
     },
-    async inspect(id) { return { meta: { id: String(id) } } }
+    async inspect(id) { return { meta: { id: String(id), cwd: '/tmp/example', agentPreset: 'continuum' } } }
   }
 }
 

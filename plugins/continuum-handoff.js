@@ -70,6 +70,9 @@ export default function continuumHandoffPlugin() {
               try {
                 const inspection = await ctx.sessionController.inspect(child.sessionId)
                 if (String(inspection.meta.id) !== String(child.sessionId)) throw new Error('fork child identity mismatch')
+                const parentHeader = invocation.agent.session.header
+                if (parentHeader.cwd !== undefined && inspection.meta.cwd !== undefined && String(inspection.meta.cwd) !== String(parentHeader.cwd)) throw new Error('fork child workspace mismatch')
+                if (parentHeader.agentPreset !== undefined && inspection.meta.agentPreset !== undefined && String(inspection.meta.agentPreset) !== String(parentHeader.agentPreset)) throw new Error('fork child preset mismatch')
               } catch (error) {
                 return { kind: 'error', text: 'Child Session ' + String(child.sessionId) + ' was created but recovery verification failed; parent retained. ' + (error instanceof Error ? error.message : String(error)) }
               }

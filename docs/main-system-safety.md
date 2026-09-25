@@ -10,7 +10,7 @@ Continuum writes only under:
 - `/home/fares/.dsh/.agent-presets/continuum/`
 - `/home/fares/.dsh/.agent-presets/continuum-curator/`
 
-The dynamic Package `hand-3/pkg-10` is process-local and is owned by this Session.
+The dynamic Package `hand-3/pkg-11` is process-local and is owned by this Session.
 
 ## Checks
 
@@ -24,7 +24,7 @@ cordis/agent.cordis.yml    2b8d89c3137ce685f3d97f65aea5bd1c5099e08bba6c168157682
 
 - The custom presets were copied through `agentPresets.copy()` and mount-validated with `agentPresets.standingKeyFor()`.
 - The DSH Host composition, shipped preset files, persistence registry, credentials, and model route were not edited.
-- `hand-3/pkg-10` reports Host `running`, no waiting services, and publishes no services. Its fail-closed guards require goals/jobs visibility, quiescent turn/job state, a non-active goal, child inspection, and an idempotency key before reporting a fork.
+- `hand-3/pkg-11` reports Host `running`, no waiting services, and publishes no services. Its fail-closed guards require goals/jobs visibility, quiescent turn/job state, a non-active goal, child inspection, and an idempotency key before reporting a fork.
 
 ## Known pre-existing condition
 

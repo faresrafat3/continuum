@@ -1,6 +1,6 @@
 # Continuum dynamic Host package
 
-The active process-local package is `hand-3/pkg-10` (`Continuum Handoff + Human Fork (fail-closed)`).
+The active process-local package is `hand-3/pkg-11` (`Continuum Handoff + Human Fork (verified child)`).
 
 ## Capabilities
 
@@ -13,8 +13,8 @@ The active process-local package is `hand-3/pkg-10` (`Continuum Handoff + Human 
 - No arbitrary cross-session id is accepted.
 - Archive remains the existing user-confirmed Workspace UI action and is one-way navigation metadata, not deletion.
 - The package does not edit Host composition, shipped presets, persistence, credentials, or the Main System.
-- Dynamic definitions disappear on DSH restart; use `cordis_inspect_self` with `pluginId=hand-3` and `packageId=pkg-10` to recover the exact source, then define it again if needed.
+- Dynamic definitions disappear on DSH restart; use `cordis_inspect_self` with `pluginId=hand-3` and `packageId=pkg-11` to recover the exact source, then define it again if needed.
 
 ## Current verification
 
-`cordis_inspect_self(pluginId="hand-3", packageId="pkg-10")` reports Host `running`, no waiting services, and no published services. The source-level test `node plugins/continuum-handoff.test.mjs` passes, including fail-closed missing-service, running-Session, active-job, paused/active-goal, open-turn, redaction, child-identity, and idempotency guards.
+`cordis_inspect_self(pluginId="hand-3", packageId="pkg-11")` reports Host `running`, no waiting services, and no published services. The source-level test `node plugins/continuum-handoff.test.mjs` passes, including fail-closed missing-service, running-Session, active-job, paused/active-goal, open-turn, redaction, child identity/workspace/preset, and idempotency guards.
