@@ -141,8 +141,16 @@ def ensure_file(root: Path, relative: str, content: str) -> bool:
 
 
 def init_workspace(args: argparse.Namespace) -> int:
-    root = Path(args.root).expanduser().resolve()
+    requested = Path(args.root).expanduser()
+    if requested.is_symlink():
+        print(json.dumps({"ok": False, "error": "workspace root must not be a symlink"}))
+        return 1
+    root = requested.resolve()
     root.mkdir(parents=True, exist_ok=True)
+    control = root / ".agent-workspace"
+    if control.is_symlink() or (control.exists() and any(path.is_symlink() for path in control.rglob("*"))):
+        print(json.dumps({"ok": False, "error": "workspace control directory contains a symlink"}))
+        return 1
     name = args.name or root.name
     if "\n" in name or "\r" in name or len(name) > 120:
         print(json.dumps({"ok": False, "error": "name must be a single line of at most 120 characters"}))
@@ -316,6 +324,7 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
         "WorkspaceManifest": schema_dir / "workspace.schema.json",
         "ValidationPolicy": schema_dir / "validation.schema.json",
         "Task": schema_dir / "task.schema.json",
+        "MinimalTask": schema_dir / "minimal-task.schema.json",
         "TaskState": schema_dir / "state.schema.json",
         "Research": schema_dir / "research.schema.json",
         "SourceLedger": schema_dir / "sources.schema.json",
@@ -349,6 +358,9 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
     validation = root / ".agent-workspace" / "validation.yaml"
     if validation.exists(): records.append((validation, "ValidationPolicy"))
     for task in discover_tasks(root):
+        if task.is_file():
+            records.append((task, "MinimalTask"))
+            continue
         if (task / "task.yaml").exists(): records.append((task / "task.yaml", "Task"))
         if (task / "state.yaml").exists(): records.append((task / "state.yaml", "TaskState"))
         handoffs = task / "handoffs"
@@ -356,17 +368,20 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
             for path in handoffs.glob("*.md"):
                 records.append((path, "Handoff"))
     research_dir = root / ".agent-workspace" / "research"
-    if research_dir.exists():
-        for path in research_dir.glob("*.md"):
-            records.append((path, "Research"))
-        for path in research_dir.rglob("research.yaml"):
-            records.append((path, "Research"))
-        for path in research_dir.rglob("sources.yaml"):
-            records.append((path, "SourceLedger"))
+    archive_dir = root / ".agent-workspace" / "archive"
+    for research_root in [research_dir, archive_dir]:
+        if research_root.exists():
+            for path in research_root.glob("RES-*.md"):
+                records.append((path, "Research"))
+            for path in research_root.rglob("research.yaml"):
+                records.append((path, "Research"))
+            for path in research_root.rglob("sources.yaml"):
+                records.append((path, "SourceLedger"))
     decision_dir = root / ".agent-workspace" / "decisions"
-    if decision_dir.exists():
-        for path in decision_dir.glob("ADR-*.md"):
-            records.append((path, "Decision"))
+    for decision_root in [decision_dir, archive_dir]:
+        if decision_root.exists():
+            for path in decision_root.rglob("ADR-*.md"):
+                records.append((path, "Decision"))
     for path, kind in records:
         raw = text(path) if path.suffix == ".yaml" else frontmatter(path)
         if raw is None:
@@ -374,9 +389,27 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
             continue
         try:
             value = normalize(yaml.safe_load(raw))
-            jsonschema.validate(value, schemas[kind])
+            if kind == "SourceLedger":
+                from urllib.parse import urlparse
+                for source in value.get("sources", []) if isinstance(value, dict) else []:
+                    parsed = urlparse(str(source.get("url", "")))
+                    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                        raise ValueError(f"source URL is not http(s): {source.get('id')}")
+            validator = jsonschema.Draft202012Validator(schemas[kind], format_checker=jsonschema.FormatChecker())
+            validation_errors = list(validator.iter_errors(value))
+            if validation_errors:
+                raise validation_errors[0]
         except Exception as error:
             errors.append(f"schema validation failed for {path.relative_to(root)}: {error}")
+    if validation.exists():
+        try:
+            policy = yaml.safe_load(text(validation)) or {}
+            for profile_name, profile in (policy.get("profiles") or {}).items():
+                for step in profile.get("steps") or []:
+                    if step.get("kind") == "command" and (not step.get("argv") or not step.get("timeout_seconds")):
+                        errors.append(f"validation command step is not executable: {profile_name}/{step.get('id')}")
+        except Exception as error:
+            errors.append(f"cannot inspect validation policy: {error}")
     return errors, warnings
 
 
@@ -523,6 +556,11 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if handoff_dir.exists():
             for handoff in sorted(handoff_dir.glob("*.md")):
                 raw = text(handoff)
+                for heading in ["Objective and acceptance target", "Confirmed facts and read set", "Completed", "Current operation", "Exact next action", "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts", "Stale or contradictory information"]:
+                    if f"# {heading}" not in raw:
+                        errors.append(f"handoff missing body section {heading}: {handoff.relative_to(root)}")
+                if "Source Session:" not in raw and "@[" not in raw:
+                    errors.append(f"handoff has no source Session reference: {handoff.relative_to(root)}")
                 match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", raw, re.MULTILINE)
                 if match is None:
                     errors.append(f"handoff has no valid id: {handoff.relative_to(root)}")
@@ -549,7 +587,9 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                     previous_revision = revision
     for directory, prefix, target in [
         (root / ".agent-workspace" / "research", "RES", research_ids),
+        (root / ".agent-workspace" / "archive", "RES", research_ids),
         (root / ".agent-workspace" / "decisions", "ADR", decision_ids),
+        (root / ".agent-workspace" / "archive", "ADR", decision_ids),
     ]:
         if directory.exists():
             for path in directory.rglob("*"):
@@ -579,6 +619,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             reference_files.extend(p for p in (task / "handoffs").rglob("*") if p.is_file())
     reference_files.extend(p for p in (root / ".agent-workspace" / "research").rglob("*") if p.is_file())
     reference_files.extend(p for p in (root / ".agent-workspace" / "decisions").rglob("*") if p.is_file())
+    reference_files.extend(p for p in (root / ".agent-workspace" / "archive").rglob("*") if p.is_file())
     seen_files: set[Path] = set()
     for candidate in reference_files:
         if candidate in seen_files: continue
@@ -591,10 +632,25 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 if ref.startswith("ADR-") and ref not in decision_ids: errors.append(f"broken decision reference {ref} in {file_path.relative_to(root)}")
                 if ref.startswith("RUN-") and ref not in run_ids: errors.append(f"unknown validation run reference {ref} in {file_path.relative_to(root)}")
                 if re.match(r"^H-\d{8}-\d{3}$", ref) and ref not in handoff_ids: errors.append(f"unknown handoff reference {ref} in {file_path.relative_to(root)}")
+    archive_root = root / ".agent-workspace" / "archive"
+    if archive_root.exists():
+        for path in archive_root.rglob("task.yaml"):
+            if scalar(path, "status") not in {"done", "cancelled"}:
+                errors.append(f"archived task is not terminal: {path.relative_to(root)}")
+        for path in archive_root.rglob("research.yaml"):
+            if scalar(path, "status") in {"planned", "active"}:
+                errors.append(f"archived research is not terminal: {path.relative_to(root)}")
+        for path in archive_root.rglob("ADR-*.md"):
+            if scalar(path, "status") not in {"accepted", "rejected", "superseded"}:
+                errors.append(f"archived decision is not terminal: {path.relative_to(root)}")
     git = git_identity(root)
     if git.get("root") is None:
         warnings.append("workspace is not inside a readable Git repository")
-    for research_yaml in (root / ".agent-workspace" / "research").glob("RES-*/research.yaml") if (root / ".agent-workspace" / "research").exists() else []:
+    research_records = []
+    for research_root in [root / ".agent-workspace" / "research", root / ".agent-workspace" / "archive"]:
+        if research_root.exists():
+            research_records.extend(research_root.rglob("RES-*/research.yaml"))
+    for research_yaml in research_records:
         directory = research_yaml.parent
         notes = directory / "notes.md"
         sources = directory / "sources.yaml"
@@ -717,6 +773,14 @@ def context(args: argparse.Namespace) -> int:
     for path in ordered:
         if path in seen or not path.exists() or not path.is_file():
             continue
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            print(json.dumps({"ok": False, "error": f"context path escapes workspace: {path}"}))
+            return 1
+        if path.is_symlink():
+            print(json.dumps({"ok": False, "error": f"context path is a symlink: {path}"}))
+            return 1
         seen.add(path)
         source = text(path, 100_000)
         content = redact(source)

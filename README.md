@@ -9,7 +9,7 @@ A local DSH operating protocol for clean context, evidence-backed research, resu
 - `docs/research/context-engineering-sota-review.md` — primary-source research and framework decision matrix.
 - `.agent-workspace/` — WCS coordination plane for this project.
 - `bin/continuum-workspace` — dependency-free workspace initializer/doctor CLI.
-- `plugins/continuum-handoff.js` — source of record for the process-local `hand-3/pkg-4` Host package.
+- `plugins/continuum-handoff.js` — source of record for the process-local `hand-3/pkg-12` Host package.
 
 ## Safety boundary
 

@@ -25,9 +25,12 @@ export default function continuumHandoffPlugin() {
           render(_args, value) { return [{ type: 'text', text: value }] }
         },
         execute(args, exec) {
+          const taskId = args.taskId || 'unassigned'
+          if (taskId !== 'unassigned' && !/^T-[0-9]{4}$/.test(taskId)) throw new Error('taskId must be T-####')
+          if (String(args.objective || '').length > 4000 || String(args.note || '').length > 2000) throw new Error('handoff input exceeds bounded limits')
           const agent = exec.agent
           if (agent === undefined || agent.session === undefined) throw new Error('continuum_handoff requires the current Agent-backed Session')
-          return JSON.stringify(makeHandoff(ctx, agent, args.taskId || 'unassigned', args.objective || '', args.note || ''), null, 2)
+          return JSON.stringify(makeHandoff(ctx, agent, taskId, args.objective || '', args.note || ''), null, 2)
         }
       })
       ctx.effect(() => harness.registerTool(ctx, tool), 'continuum-handoff-tool')
@@ -47,13 +50,18 @@ export default function continuumHandoffPlugin() {
         yield ctx.commands.register({
           name: 'continuum-handoff',
           description: 'Print a bounded recovery prompt for this Session',
-          handler: invocation => ({ kind: 'success', text: makeHandoff(ctx, invocation.agent, firstToken(invocation.rawInput) || 'unassigned', '', '').prompt })
+          handler: invocation => {
+            const taskId = firstToken(invocation.rawInput) || 'unassigned'
+            if (taskId !== 'unassigned' && !/^T-[0-9]{4}$/.test(taskId)) return { kind: 'error', text: 'Task id must be T-####.' }
+            return { kind: 'success', text: makeHandoff(ctx, invocation.agent, taskId, '', '').prompt }
+          }
         })
         yield ctx.commands.register({
           name: 'continuum-fork',
           description: 'Fork this Session at a completed-turn boundary; the parent is retained',
           handler: invocation => run(async () => {
             const taskId = firstToken(invocation.rawInput) || 'unassigned'
+            if (taskId !== 'unassigned' && !/^T-[0-9]{4}$/.test(taskId)) return { kind: 'error', text: 'Task id must be T-####.' }
             const key = String(invocation.agent.id) + '|' + taskId
             if (forkInFlight) return { kind: 'error', text: 'Continuum fork is already in progress; wait for the first child to be created.' }
             forkInFlight = true

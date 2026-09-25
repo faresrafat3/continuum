@@ -111,9 +111,9 @@ is still desired, create a new goal in this Session only after recovery passes.
 
 ## 7. Status, evidence, and unresolved risk
 
-- **Status:** second-pass QA complete; this answer is the only artifact changed in the evaluation.
+- **Status:** second-pass QA complete; this file is the only artifact this answer modified. The surrounding worktree is dirty and the task state record still claims clean, so every checkpoint here is provisional.
 - **Artifact:** `/home/fares/continuum-system/evals/continuum-router/iteration-1/handoff-dirty-session/with-skill/output.md`.
-- **Evidence produced:** the answer was checked against `continuum-router`, `continuum-handoff`, workspace policy, and two independent read-only recursive QA passes. Both reviewers confirmed they owned no descendants. The current read-only checks also passed: `./bin/continuum-workspace doctor --strict` reported `ok: true`, and `python3 -B -m unittest discover -s .agent-workspace/tests -v` passed all 17 tests.
-- **Not performed:** no live old-Session inventory, Git/job/goal mutation, archive, deletion, or transfer was claimed.
-- **Unresolved risk:** the source Session, job, goal, task, and Git values remain unknown by design; the handoff is not verified until the old Session fills them from current evidence.
+- **Evidence produced:** the answer was checked against `continuum-router`, `continuum-handoff`, workspace policy, and independent read-only recursive QA passes (no reviewer owned descendants). Verification: `./bin/continuum-workspace doctor --strict` → `ok: false`, exit 1, error `state says clean but Git has changes in .agent-workspace/tasks/T-0001-build-continuum/state.yaml`; `python3 -B -m unittest discover -s .agent-workspace/tests -v` → `Ran 22 tests … OK`. The doctor failure is a task-state/working-tree mismatch, not a defect in this answer, and the checkpoint is provisional until reconciled.
+- **Not performed:** no live old-Session inventory, Git/job/goal mutation, state repair, archive, deletion, or transfer was claimed.
+- **Unresolved risk:** the source Session, job, goal, task, and Git values remain unknown by design; the handoff is not verified until the old Session fills them from current evidence. `doctor --strict` currently fails on the state/working-tree mismatch, so the owning workspace must reconcile it before its checkpoint can be treated as verified.
 - **Single next action:** create the bounded, timestamped recovery handoff in the old Session, then hold writer transfer until the source job is terminal and its effects are reconciled.

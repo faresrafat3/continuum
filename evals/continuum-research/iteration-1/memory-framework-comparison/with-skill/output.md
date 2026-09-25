@@ -103,14 +103,17 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 | S-LET-02 | Letta, [current source notice](https://raw.githubusercontent.com/letta-ai/letta/main/README.md) and [Letta Code README](https://raw.githubusercontent.com/letta-ai/letta-code/main/README.md) | Current `main`, 2026-09-25 | Official repo; high | Active code moved to `letta-code`; V1 API server is on `archive`; cloud is default but local backend exists. |
 | S-LET-03 | Letta, [Permissions](https://docs.letta.com/configuration/permissions.md), “Permission modes” and “Cross-agent memory guard” | Live docs, 2026-09-25 | Official docs; high | Interactive CLI starts unrestricted; standard/strict modes, persistent allow/deny rules, and cross-agent memory guard. |
 | S-LET-04 | Letta, [Memory & dreaming](https://docs.letta.com/configuration/memory/index.md) | Live docs, 2026-09-25 | Official docs; high | Agent/dreaming updates, commits, reorganization, and optional agent review that does not itself request approval. |
-| S-LET-05 | [Letta PyPI](https://pypi.org/pypi/letta/json) and [npm registry](https://registry.npmjs.org/@letta-ai/letta-code/latest) | 0.33.1, 2026-09-24; Apache-2.0 | Registry; high | Current packaged CLI/version/license. Package is rapidly changing. |
+| S-LET-05 | [Letta PyPI](https://pypi.org/pypi/letta/json), [npm registry](https://registry.npmjs.org/@letta-ai/letta-code/latest), and [pinned LICENSE](https://raw.githubusercontent.com/letta-ai/letta-code/5631c531da7ee8458decaf49e26a834119e6e549/LICENSE) | 0.33.1, 2026-09-24; Apache-2.0 plus brand-assets exclusion | Registry/license; high | Current packaged CLI/version. Code is Apache-2.0; names, logos, wordmarks, images, and ASCII art are excluded. |
+| S-LET-06 | Letta Code release metadata for [v0.32.18](https://api.github.com/repos/letta-ai/letta-code/releases/tags/v0.32.18) and [v0.33.0](https://api.github.com/repos/letta-ai/letta-code/releases/tags/v0.33.0); retired V1 [0.16.8](https://api.github.com/repos/letta-ai/letta/releases/tags/0.16.8) | 2026-09-23, 2026-09-23, and 2026-05-14 | Official release metadata; high | Serialized memory-checkout writers/background upkeep, post-turn Git conflict repair, ambient credential redaction, and the final legacy V1 release. |
+| S-LET-07 | Letta Agent SDK, [Sessions, turns, and durability](https://docs.letta.com/agent-sdk/sessions.md), “Guarantees and non-guarantees” | Live docs, 2026-09-25 | Official docs; high | Missed events are not replayed; reconcile with message listing/bootstrap; do not blindly retry an ambiguous `send()`. |
 | S-LM-01 | LangMem, [Core Concepts](https://langchain-ai.github.io/langmem/concepts/conceptual_guide/), “Types of Memory,” “Writing memories,” and “Storage System” | Live docs, 2026-09-25 | Official docs; high | LLM-driven extraction/consolidation; semantic/episodic/procedural forms; store-agnostic core and LangGraph stateful layer. |
 | S-LM-02 | LangMem, [README](https://raw.githubusercontent.com/langchain-ai/langmem/main/README.md) and [PyPI](https://pypi.org/pypi/langmem/json) | 0.0.30, uploaded 2025-10-27; MIT | Official repo/registry; high | Hot-path tools/background manager and storage boundary. Pre-1.0 and comparatively stale release. |
 | S-MEM-01 | Mem0, [OSS v2-to-v3 migration](https://docs.mem0.ai/migration/oss-v2-to-v3.md), “Overview,” “Add Calls,” and “How the New Algorithm Works” | Live docs, 2026-09-25 | Official docs; high | Current ADD-only extraction, old facts retained, hybrid/entity retrieval, graph memory removed from OSS. Breaking and volatile. |
 | S-MEM-02 | Mem0, [OSS overview](https://docs.mem0.ai/open-source/overview.md), [setup](https://docs.mem0.ai/open-source/setup.md), and [configuration](https://docs.mem0.ai/open-source/configuration.md) | Live docs, 2026-09-25 | Official docs; high | Local Qdrant/history defaults, self-host Postgres/pgvector, auth/audit server, provider configurability. Operational defaults may change. |
 | S-MEM-03 | Mem0, [repository README](https://raw.githubusercontent.com/mem0ai/mem0/main/README.md), “New Memory Algorithm” and benchmark table | `main`, 2026-09-25 | Vendor benchmark/marketing; medium for managed claims, **low for OSS transfer** | Explicitly says scores are managed-platform results with proprietary optimizations and not identical in OSS. |
 | S-GR-01 | Zep/Graphiti, [Graphiti README](https://raw.githubusercontent.com/getzep/graphiti/main/README.md), “What is a Context Graph,” “Zep vs. Graphiti,” installation, local models, and telemetry | `main`, 2026-09-25 | Official repo; high for OSS architecture, medium for performance claims | Temporal facts/validity, episode provenance, BYO graph DB, no user/conversation management, local model path, opt-out telemetry. |
-| S-GR-02 | [Graphiti Core PyPI](https://pypi.org/pypi/graphiti-core/json) | 0.30.2, uploaded 2026-09-08; Apache-2.0 | Registry; high | Current release/license. Fast-moving extraction pipeline. |
+| S-GR-02 | [Graphiti Core PyPI](https://pypi.org/pypi/graphiti-core/json) and [v0.30.2 release](https://api.github.com/repos/getzep/graphiti/releases/tags/v0.30.2) | 0.30.2, uploaded/released 2026-09-08; Apache-2.0 | Registry/release; high | Current core release/license. Fast-moving extraction pipeline. |
+| S-GR-03 | Graphiti security release [mcp-v1.0.2](https://api.github.com/repos/getzep/graphiti/releases/tags/mcp-v1.0.2) | 2026-03-11 | Official release/security notice; high | MCP 1.0.1 and earlier had a Cypher-injection vulnerability through `graphiti-core` 0.28.1; MCP 1.0.2 requires core >=0.28.2. |
 
 ## Findings by claim
 
@@ -240,6 +243,20 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 
 **[INFERRED]** The decision has lower confidence on performance/operational cost and higher confidence on semantic boundaries. The final experiment is therefore mandatory before a framework becomes the DSH default.
 
+### C-015 — Current Letta has repair/concurrency machinery, but it is not a causal run log
+
+**[CITED]** Letta Code 0.32.18 added serialized writers for a memory checkout, silent delegated memory upkeep, and MemFS-v2 initialization; 0.33.0 added post-turn Git conflict repair and background upkeep. Those are implemented repairs to real projection/worktree conflict modes, not merely marketing claims. 【S-LET-06】
+
+**[CITED]** The current Agent SDK says it does **not** replay events missed while disconnected; callers must reconcile with message history/bootstrap state, and an ambiguous `send()` must not be blindly retried because the runtime may already have it. 【S-LET-07】
+
+**[INFERRED]** Git commits provide excellent auditability for memory edits, but MemFS commit history is not a causal record of the external effects that motivated an edit. DSH still needs its own run/effect IDs and promotion boundary.
+
+### C-016 — Graphiti's component version pair is a security boundary
+
+**[CITED]** Graphiti's MCP 1.0.2 security release states that MCP 1.0.1 and earlier had a Cypher-injection vulnerability through `graphiti-core` 0.28.1, and requires `graphiti-core >=0.28.2`. 【S-GR-03】
+
+**[RECOMMENDED]** Pin and test the core/MCP pair, reject known-vulnerable combinations, and treat a current core package alone as insufficient evidence that the installed MCP/server path is safe.
+
 ## Framework and memory matrices
 
 ### Durable execution frameworks
@@ -268,9 +285,9 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 | Who writes | DSH policy + reviewed agent candidates | Agent/dreaming using ordinary file tools; commits to Git | Agent tool in hot path or LLM manager in background | LLM extraction from conversation | LLM structured extraction/deduplication from episodes |
 | Update/curation | Explicit supersede/tombstone/review workflow | Git diff, commit, backup, reorg; dreaming consolidation | Prompted insert/update/delete/consolidate transforms | Current OSS ADD-only; new facts coexist with old facts 【S-MEM-01】 | New facts invalidate edges while preserving history/provenance 【S-GR-01】 |
 | Retrieval | Exact IDs, recency, FTS/vector added later | `system/` always injected; other files by search/read tools | Direct, semantic, metadata search through store 【S-LM-01】 | Semantic + optional BM25/entity boosts 【S-MEM-01】 | Semantic + keyword + graph traversal/time-aware queries |
-| Provenance/versioning | First-class fields and event links | Git commit history | Application-defined; not automatic in core docs | Metadata/history exist, but no run-level replay contract | Episode lineage and fact validity windows are strongest here |
+| Provenance/versioning | First-class fields and event links | Git commit history plus conflict repair; not a causal effect log 【S-LET-06】 | Application-defined; not automatic in core docs | Metadata/history exist, but no run-level replay contract | Episode lineage and fact validity windows are strongest here |
 | Local operation | Best; no extra service | Local Git checkout; user backs up local agents 【S-LET-01】 | Storage-agnostic; depends on chosen store | Local Qdrant/history, but defaults call hosted OpenAI; Ollama configurable 【S-MEM-02】 | Local graph DB plus local or hosted models; much heavier 【S-GR-01】 |
-| Security default | DSH-controlled | Interactive CLI starts unrestricted; memory guard exists 【S-LET-03】 | No agent auth; app owns store/namespace/tool policy | Library has no API auth; self-host server auth on by default 【S-MEM-02】 | Library has no user/conversation management; DB/model endpoints are the boundary |
+| Security default | DSH-controlled | Interactive CLI starts unrestricted; memory guard exists; SDK explicitly does not replay missed events 【S-LET-03】【S-LET-07】 | No agent auth; app owns store/namespace/tool policy | Library has no API auth; self-host server auth on by default 【S-MEM-02】 | No user/conversation management; DB/model endpoints are the boundary; MCP <=1.0.1 requires a core security floor 【S-GR-03】 |
 | Poisoning exposure | Low if trusted/untrusted scopes and review enforced | High: `system/` persists and is injected every turn | High if the agent can write trusted policy items | High if corrected/hostile facts accumulate and rank well | High if raw episodes or extracted edges are accepted as trusted facts |
 | Deletion/retention | Explicit and auditable | Git history retains deleted content unless history rewritten/purged | Store-specific | ADD-only current data requires supersession/tombstone design; entity cascade exists in server | “Invalidate, do not delete” preserves old facts and episodes by design |
 | Replay relationship | Explicitly couple candidates to source event | Git commit is not run rollback | Store writes are not automatically checkpointed | Memory writes are not automatically run rollback | Temporal facts are not run replay |
@@ -307,14 +324,16 @@ All sources were accessed **2026-09-25**. Confidence refers to fitness for the s
 1. **“Exactly once” is scope-dependent.** Restate's managed communication and K/V state are strongly journaled, but its own DB examples expose an external-effect retry window. Temporal protects workflow sequencing but Activities can duplicate. LangGraph preserves pending writes but time travel re-fires calls. Treat exactly-once as a property of a bounded protocol, not a framework adjective. 【C-010】
 2. **Durability mode is not effect durability.** LangGraph `sync` controls checkpoint persistence before the next step; it does not atomically commit an external API and checkpoint. 【C-002】
 3. **Long-term memory is not run state.** Even a git-backed memory repository is not an execution log, and a vector store is not a permission system. 【C-001】【C-011】
-4. **Letta naming/version drift is material.** Older examples of core/recall/archival memory describe archived V1, while current Letta Code uses MemFS. Any comparison that does not name the branch/package is stale. 【C-005】
-5. **Mem0's benchmark is not OSS evidence.** The vendor itself limits transfer of its 2026 numbers. 【C-013】
-6. **Graphiti's provenance is derived provenance.** Episode lineage is valuable, but extracted entities/edges and evolving summaries still depend on LLM extraction; raw episode review may be necessary.
-7. **Shared namespaces/filters are not proven authorization boundaries.** Mem0 filters, LangMem namespaces, and Graphiti group IDs organize data but require a separate auth design. This is an inference, not a claim that those products have an isolation vulnerability.
-8. **Local encryption varies.** LangGraph and Temporal provide value-encryption mechanisms; Restate's current value codec is TypeScript-only and excludes some metadata. Mem0 and Graphiti inherit security from their database/server/model providers. Letta Git memory has no source found here that establishes application-level encryption-at-rest.
-9. **Operational cost is unmeasured.** No primary source or local experiment establishes DSH-specific install size, cold-start time, migration time, disk growth, or upgrade burden.
-10. **Language/package parity still needs a pinned spike.** The detailed durability prose above is primarily from Python packages/docs; DSH is Node-based. Current registries identify LangGraph JS 1.4.18, Temporal TS 1.24.0, and Restate TS 1.17.2, but exact serde, versioning, and security behavior must be rechecked in those pinned JavaScript packages before adoption. 【S-LG-05】【S-TMP-10】【S-RS-07】
-11. **Rapid release cadence changes conclusions.** LangMem is pre-1.0; Letta, Mem0, and Graphiti changed materially in 2026; Restate changed license posture and SDK compatibility. Pin versions and re-run the experiment on upgrade.
+4. **Letta naming/version drift is material.** Older examples of core/recall/archival memory describe archived V1 (final release 0.16.8), while current Letta Code 0.33.1 uses MemFS. Any comparison that does not name the branch/package is stale. 【C-005】【S-LET-06】
+5. **Letta MemFS is repairable, not replay-complete.** Current release notes add serialized writers and Git conflict repair, while the SDK explicitly does not replay events missed during disconnection. Commit history helps audit memory; it does not recover an ambiguous send or external effect. 【C-015】
+6. **Mem0's benchmark is not OSS evidence.** The vendor itself limits transfer of its 2026 numbers. 【C-013】
+7. **Graphiti's provenance is derived provenance.** Episode lineage is valuable, but extracted entities/edges and evolving summaries still depend on LLM extraction; raw episode review may be necessary.
+8. **Graphiti's security floor is a version-pair rule.** MCP 1.0.1 and earlier were affected by a Cypher-injection issue through core 0.28.1; the patched MCP requires core >=0.28.2. A current core package does not by itself certify the installed server path. 【C-016】
+9. **Shared namespaces/filters are not proven authorization boundaries.** Mem0 filters, LangMem namespaces, and Graphiti group IDs organize data but require a separate auth design. This is an inference, not a claim that those products have an isolation vulnerability.
+10. **Local encryption varies.** LangGraph and Temporal provide value-encryption mechanisms; Restate's current value codec is TypeScript-only and excludes some metadata. Mem0 and Graphiti inherit security from their database/server/model providers. Letta Git memory has no source found here that establishes application-level encryption-at-rest.
+11. **Operational cost is unmeasured.** No primary source or local experiment establishes DSH-specific install size, cold-start time, migration time, disk growth, or upgrade burden.
+12. **Language/package parity still needs a pinned spike.** The detailed durability prose above is primarily from Python packages/docs; DSH is Node-based. Current registries identify LangGraph JS 1.4.18, Temporal TS 1.24.0, and Restate TS 1.17.2, but exact serde, versioning, and security behavior must be rechecked in those pinned JavaScript packages before adoption. 【S-LG-05】【S-TMP-10】【S-RS-07】
+13. **Rapid release cadence changes conclusions.** LangMem is pre-1.0; Letta, Mem0, and Graphiti changed materially in 2026; Restate changed license posture and SDK compatibility. Pin versions and re-run the experiment on upgrade.
 
 ## Recommendation and trade-offs
 
@@ -368,13 +387,13 @@ optional opt-in Git/Markdown agent memory (Letta-style MemFS)
 
 Review this report when any of the following occurs:
 
-- LangGraph moves from `1.2.x`, changes `BaseCheckpointSaver`, strict-msgpack defaults, or time-travel semantics.
-- Temporal changes Event History, Worker Versioning, default authorization, persistence guidance, or local CLI behavior.
-- Restate changes BSL terms, journal format, SDK 1.x compatibility, encryption support, or default local ports/security.
-- Letta changes MemFS layout, default backend/permission mode, or retires/renames the archived V1 model.
+- LangGraph Python/JS changes checkpoint saver/serde, strict-msgpack or JavaScript deserialization guidance, durability modes, or time-travel semantics.
+- Temporal changes Event History, Worker Versioning, default authorization, persistence guidance, TypeScript workflow sandbox, or local CLI behavior.
+- Restate changes BSL terms, journal format, SDK compatibility, encryption support, RocksDB schema, or default local ports/security.
+- Letta changes MemFS layout/conflict repair, Agent SDK missed-event or ambiguous-send guarantees, default backend/permission mode, or the archived V1 boundary.
 - LangMem reaches 1.0 or changes manager/store contracts.
 - Mem0 changes ADD-only behavior, restores graph support to OSS, or changes default providers/auth.
-- Graphiti changes episode/fact lineage, supported local graph backends, or default telemetry/model behavior.
+- Graphiti changes episode/fact lineage, supported local graph backends, telemetry/model behavior, or publishes a core/MCP security advisory such as the 1.0.2 Cypher-injection fix. 【S-GR-03】
 - A DSH incident shows duplicate effects, secret retention, cross-agent memory access, or stale-memory behavior.
 - The experiment below is run and produces a result that changes the recommendation.
 
@@ -387,7 +406,7 @@ Does the recommended DSH-native ledger plus explicit memory materially underperf
 ### Pre-registered hypothesis
 
 **H1:** With identical tool semantics, DSH-native SQLite plus an effect ledger will match durable-framework crash recovery and require less integration code.  
-**H2:** Explicit, reviewed memory will have better correction accuracy and policy-write safety than automatic LangMem/Mem0 memory, with a recall advantage no larger than 10 percentage points.  
+**H2:** Explicit, reviewed memory will have better correction accuracy and policy-write safety than automatic LangMem, Mem0, or Graphiti memory, with a recall advantage no larger than 10 percentage points.  
 **H3:** No framework arm will achieve zero duplicate observable effects unless every sink implements the same effect-ID idempotency protocol.
 
 ### Arms
@@ -404,6 +423,9 @@ Does the recommended DSH-native ledger plus explicit memory materially underperf
 - M1: explicit typed SQLite/Git records with review and supersession.
 - M2: LangMem 0.0.30 + the same local store.
 - M3: Mem0 OSS 2.2.0 with local Qdrant/history and local model/embedding endpoints.
+- M4: Graphiti Core 0.30.2 with a patched MCP line (core >=0.28.2), local Neo4j/FalkorDB, and local model/embedding endpoints.
+
+Letta Code is deliberately excluded from this adapter bake-off because it is a whole agent harness with its own runtime, permissions, sessions, and memory rather than a memory adapter. If Letta is shortlisted, run a separate whole-harness pilot against the same workload and thresholds. 【C-005】
 
 Run the same adapters twice: once with the tool sink enforcing `effect_id`, once with a deliberately non-idempotent sink. This makes the exactly-once boundary visible instead of hiding it behind framework marketing.
 
@@ -441,6 +463,7 @@ Repeat each point/task combination three times with recorded seeds. Separately t
 - 100% terminal-state equivalence to the fault-free reference run;
 - 0 unauthorized tool executions and 0 approvals accepted after argument/policy/plugin hash change;
 - 0 canary-secret values in unencrypted checkpoints, journals, traces, or memory indexes;
+- 0 pinned package/component pairs with a known high/critical advisory in the official release history at decision time (for example, never use Graphiti MCP <=1.0.1 with core 0.28.1) 【S-GR-03】;
 - 0 duplicate observable sink effects when the sink enforces the documented `effect_id` protocol;
 - p95 recovery time no more than 2× the no-fault run;
 - operator-visible recovery commands and integration code recorded, not estimated.

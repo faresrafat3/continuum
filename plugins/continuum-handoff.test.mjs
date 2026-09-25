@@ -85,6 +85,8 @@ assert.match(preview.prompt, /T-0001/)
 const redactedPreview = JSON.parse(registeredTool.execute({ taskId: 'T-0001', objective: 'client_secret=supersecret', note: 'Authorization: Bearer abcdefghijklmnop' }, { agent }))
 assert.ok(!JSON.stringify(redactedPreview).includes('supersecret'))
 assert.ok(!JSON.stringify(redactedPreview).includes('abcdefghijklmnop'))
+assert.throws(() => registeredTool.execute({ taskId: '../../escape', objective: '' }, { agent }))
+assert.throws(() => registeredTool.execute({ taskId: 'T-0001', objective: 'x'.repeat(4001) }, { agent }))
 
 const handoff = commands.get('continuum-handoff')
 assert.ok(handoff)

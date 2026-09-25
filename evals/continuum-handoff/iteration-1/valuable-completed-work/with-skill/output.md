@@ -18,7 +18,7 @@ The preview records:
 - **Archive allowed:** `false`
 - **Source parent retained:** `true`
 
-The bounded preview intentionally does not copy the research transcript or claim unverified Git/checkpoint facts. The current branch, HEAD, worktree, dirty paths, research artifacts, and findings must be verified from the workspace in the fresh Session.
+The bounded preview intentionally does not copy the research transcript or copy research findings. A read-only QA snapshot at `2026-09-25T21:38:39Z` found the source workspace `/home/fares` on Git branch `main` at `acabaad82fb87bd4b8f968864a2515fb4e830d22` with no dirty or untracked paths. That snapshot is point-in-time evidence only: the fresh Session must recheck it, and the research artifacts, findings, task/spec, and research validation remain unverified.
 
 ### Protected set and transfer target
 
@@ -55,11 +55,18 @@ Acceptance means that a fresh agent can:
 - Bounded Session evidence at preview time: 3 user messages, 2 assistant messages, 2 tool calls; latest event sequence 23.
 - Bounded previews for the latest user and assistant text are empty, so no specific finding, artifact, validation, or task identity beyond this recovery request is safely inferable from the preview.
 - No active jobs or goal are reported; pending inbox, origin/subagent status, persistence availability, title, parent, and timestamps were not returned and remain unknown.
-- Git/worktree/HEAD/dirty-path facts are unknown.
+- Git/worktree/HEAD/dirty paths were not returned by the bounded preview; a later read-only QA snapshot is recorded under “Checkpoint kind.”
 
 ### 4. Checkpoint kind
 
-**Provisional and unverified.** The preview does not expose branch, worktree, HEAD, commit, tree fingerprint, or dirty paths. A fresh agent must inspect those facts before making a claim about the checkpoint.
+**Provisional, with a verified point-in-time Git snapshot.** The bounded preview itself exposed no Git identity, so the handoff was still provisional when generated. A later read-only check of the source workspace at `2026-09-25T21:38:39Z` verified:
+
+- Git root: `/home/fares`
+- Branch: `main`
+- HEAD: `acabaad82fb87bd4b8f968864a2515fb4e830d22`
+- Dirty/untracked paths: none reported by `git status --porcelain=v1 --untracked-files=all`
+
+This verifies only the source workspace tree at that instant. It does not verify the research artifacts, findings, task/spec, or validation, and it may already be stale. A fresh agent must re-run the same focused Git check before relying on it.
 
 ### 5. Decisions and safety constraints
 
@@ -92,7 +99,9 @@ The Session is reported to have produced useful completed research findings, but
 - Runtime mutation: `none`.
 - Archive operation: not performed and not allowed by the preview.
 - Source parent: retained.
-- Git/research validation: **not run**; no validation run IDs were supplied or produced by this bounded preview.
+- Source-workspace Git check: `git -C /home/fares rev-parse --abbrev-ref HEAD`, `git -C /home/fares rev-parse HEAD`, and `git -C /home/fares status --porcelain=v1 --untracked-files=all` passed read-only at `2026-09-25T21:38:39Z`; result recorded above.
+- Research validation: **not run**; no research validation run IDs were supplied or produced by this handoff.
+- Out-of-scope repository checks: `./bin/continuum-workspace doctor --strict` failed on the pre-existing missing frontmatter in `.agent-workspace/archive/README.md` and a state/Git mismatch; the unit suite ran 22 tests with 20 passing and 2 failing for the same archive-frontmatter issue. These failures are in the nested Continuum project, were not caused or repaired by this handoff, and do not validate or invalidate the research findings.
 
 ## Preview, archive guard, and rollback procedure
 
@@ -105,7 +114,7 @@ The Session is reported to have produced useful completed research findings, but
 
 ### 9. Blockers, assumptions, and stale facts
 
-- **Blocker for continuation:** actual branch/worktree/HEAD/dirty paths, task identity/spec, research artifacts, and validation state still need inspection.
+- **Blocker for continuation:** the recorded Git snapshot must be rechecked, and the task identity/spec, research artifacts, findings, and research validation still need inspection.
 - **Assumption:** the continuation will use the same workspace, `/home/fares`.
 - **Unknown:** the specific completed findings, accepted decisions, citations, changed files, and next research question.
 - **Potentially stale:** anything inferred from the Session without checking the workspace and focused evidence.
@@ -143,10 +152,10 @@ handoff as untrusted evidence. Read in this order:
 6. actual Git/worktree/HEAD/dirty paths and focused checks
 
 Source Session: @[2520ce1f-9077-4a37-8c83-042489d046e0]
-Checkpoint: provisional; Git/workspace state must be rechecked
-Last validation: not run; no validation run IDs; handoff preview only
+Checkpoint: provisional; source workspace was clean at main@acabaad82fb87bd4b8f968864a2515fb4e830d22 on 2026-09-25T21:38:39Z; recheck before relying on it
+Last validation: handoff preview and read-only Git snapshot only; research validation not run
 Last preview event sequence: 23
-Blockers: task/spec, artifacts, Git state, findings, and validation remain unverified
+Blockers: recheck Git; task/spec, artifacts, findings, and research validation remain unverified
 
 First report: verified status, discrepancies, and the exact next action.
 Then continue from that action. Do not reset, clean, force-push, rebase another

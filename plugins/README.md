@@ -1,6 +1,6 @@
 # Continuum dynamic Host package
 
-The active process-local package is `hand-3/pkg-12` (`Continuum Handoff + Human Fork (durable outcome key)`).
+The active process-local package is `hand-3/pkg-12` (`Continuum Handoff + Human Fork (process-local outcome key)`).
 
 ## Capabilities
 

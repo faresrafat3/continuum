@@ -4,3 +4,6 @@
 {"schema_version":1,"at":"2026-09-25T05:46:00Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"specified","to":"in_progress","state_revision":4}
 {"schema_version":1,"at":"2026-09-25T06:15:00Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"in_progress","to":"validating","state_revision":5}
 {"schema_version":1,"at":"2026-09-25T06:15:00Z","type":"handoff.written","task_id":"T-0001","actor":"agent:continuum","handoff_id":"H-20260925-002","state_revision":5}
+{"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"validating","to":"done","state_revision":6}
+{"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"handoff.written","task_id":"T-0001","actor":"agent:continuum","handoff_id":"H-20260925-003","state_revision":6}
+{"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"validation.recorded","task_id":"T-0001","actor":"agent:continuum","run_id":"RUN-20260925-1300Z","result":"pass","state_revision":6}

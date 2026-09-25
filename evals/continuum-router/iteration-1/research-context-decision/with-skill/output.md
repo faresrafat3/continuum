@@ -155,7 +155,9 @@ Write a checkpoint:
 
 Use a monotonic event sequence and parent checkpoint ID. A checkpoint should be atomic, schema-versioned, hash-linked to source events/artifacts, and recoverable after a crash between file/database writes. It should classify an unknown external outcome explicitly rather than assuming “not checkpointed means not executed.”
 
-Do not promise exactly-once recovery. Model calls can be repeated, and external effects need an operation key, receiver-side deduplication or an outbox/inbox, pre/postconditions, and reconciliation. Add Temporal or a database workflow engine only when multi-process jobs, long timers, or a measured recovery SLA justify the operational cost.
+Keep three durability records distinct, mirroring LangGraph’s separation of a full superstep checkpoint from per-task pending writes and Temporal’s intent/result Activity model: a **step intent** (an operation is about to be attempted), a **step result** (it completed or failed), and an **effect receipt** (the external/local side effect was applied and how to reconcile it). “Current state” alone cannot reveal whether a tool call whose response was lost actually ran.
+
+Do not promise exactly-once recovery. Model calls can be repeated, and external effects need a stable operation key, receiver-side deduplication or an outbox/inbox, pre/postconditions, and reconciliation. Add Temporal or a database workflow engine only when multi-process jobs, long timers, or a measured recovery SLA justify the operational cost.
 
 ## 5. Evolving memory
 
@@ -198,6 +200,8 @@ The safe write path is:
 5. Retrieval first uses exact IDs, scope, and time, then optionally semantic ranking.
 6. Conflicting records are returned as a conflict rather than silently blended.
 7. Raw evidence remains recoverable; garbage collection applies only to derived indexes under a retention policy.
+
+Treat contradiction handling, abstention, and as-of temporal correctness as **first-class acceptance gates**, not secondary QA. Public memory-system evaluations report much weaker contradiction-resolution and abstention behavior than headline QA accuracy (for example, Mem0’s own BEAM results report low contradiction-resolution scores despite strong headline LongMemEval results, and current platform results omit abstention from the headline configuration) ([Mem0 paper](https://arxiv.org/abs/2504.19413), [Mem0 benchmark results](https://github.com/mem0ai/memory-benchmarks)). Evolve toward append-only corrections: Mem0 itself moved from LLM-driven UPDATE/DELETE toward ADD-only extraction with entity and temporal retrieval, which aligns with superseding rather than destructive rewrites ([Mem0 repository](https://github.com/mem0ai/mem0)).
 
 Do not put secrets, approval authority, security policy, or live service objects into ordinary model memory. Do not allow a model to edit its own system/agent preset as a side effect of “learning.” A background curator may propose ACE/PACE-style deltas, but acceptance remains a separate controlled step until local evaluations show acceptable precision.
 
@@ -348,6 +352,7 @@ Measure:
 - duplicate or missing external effects after crash/replay;
 - checkpoint restore correctness and time;
 - stale/contradictory memory use;
+- contradiction-resolution precision/recall, abstention/false-memory rate, and as-of temporal accuracy;
 - user corrections and handoff defects;
 - input/output tokens, wall time, and total cost;
 - artifact rehydration rate and unused retrieved context.
@@ -359,7 +364,7 @@ Minimum release gates:
 3. **Effect safety:** crash tests produce no undetected duplicate side effect.
 4. **Compaction fidelity:** exact IDs, pending approvals/jobs, failed constraints, validation results, and next action survive every golden trace.
 5. **Isolation integrity:** workers stay within task scope and write sets; parent verifies artifacts.
-6. **Memory safety:** no autonomous production writes; all accepted records are scoped, sourced, and auditable.
+6. **Memory safety:** no autonomous production writes; all accepted records are scoped, sourced, and auditable; contradiction, abstention, and as-of temporal metrics meet thresholds independently of headline QA.
 7. **Measured benefit:** the hybrid must improve a target metric without unacceptable cost, latency, or premature termination.
 
 ## Uncertainty and limits

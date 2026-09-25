@@ -113,7 +113,7 @@ is still desired, create a new goal in this Session only after recovery passes.
 
 - **Status:** second-pass QA complete; this answer is the only artifact changed in the evaluation.
 - **Artifact:** `/home/fares/continuum-system/evals/continuum-router/iteration-1/handoff-dirty-session/with-skill/output.md`.
-- **Evidence produced:** the answer was checked against `continuum-router`, `continuum-handoff`, workspace policy, and two independent read-only recursive QA passes. Both reviewers confirmed they owned no descendants.
-- **Not performed:** no live old-Session inventory, Git/job/goal mutation, archive, deletion, transfer, or test run was claimed.
+- **Evidence produced:** the answer was checked against `continuum-router`, `continuum-handoff`, workspace policy, and two independent read-only recursive QA passes. Both reviewers confirmed they owned no descendants. The current read-only checks also passed: `./bin/continuum-workspace doctor --strict` reported `ok: true`, and `python3 -B -m unittest discover -s .agent-workspace/tests -v` passed all 22 tests.
+- **Not performed:** no live old-Session inventory, Git/job/goal mutation, archive, deletion, or transfer was claimed.
 - **Unresolved risk:** the source Session, job, goal, task, and Git values remain unknown by design; the handoff is not verified until the old Session fills them from current evidence.
 - **Single next action:** create the bounded, timestamped recovery handoff in the old Session, then hold writer transfer until the source job is terminal and its effects are reconciled.
