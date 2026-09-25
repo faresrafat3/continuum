@@ -9,7 +9,7 @@ The unfinished implementation and dirty worktree are durable workspace state. Th
 - Do not start a duplicate job or create/replace a goal until the existing job and goal have been identified.
 - Treat all claims about the old Session's state as unverified until checked from the old Session or from workspace evidence.
 
-**Safe lifecycle:** prepare a bounded handoff → open a fresh Session at the exact same workspace → perform read-only state verification there → continue only after the job/goal discrepancy is resolved.
+**Safe lifecycle:** prepare a bounded handoff → open one fresh Session at the exact same workspace → perform read-only state verification there → stop and report; continue only on an explicit instruction after the job/goal discrepancy is resolved.
 
 # Bounded handoff prompt
 
@@ -40,9 +40,9 @@ Then report:
 - risks or blockers;
 - exactly one next action.
 
-After that report, continue the smallest verified unfinished slice. Do not broaden scope, perform cleanup, discard changes, or modify the old Session. If the active job could still mutate the worktree, wait for or safely account for it before editing.
+Stop after producing that report and wait for an explicit continuation instruction before making any edits or running any job. Do not broaden scope, perform cleanup, discard changes, or modify the old Session. If the active job could still mutate the worktree, do not edit: report the job as a blocker and request an explicit decision.
 ```
 
 # Exact next action
 
-Open a new DSH Session at the **exact same workspace**, submit the bounded handoff above, and make its first action the read-only verification sequence. Leave the old Session, its background job, its paused goal, and all worktree contents untouched; do not archive or delete anything.
+Open one fresh DSH Session at the **exact same workspace** and paste the bounded handoff into it. Leave the old Session, its background job, its paused goal, and all worktree contents untouched; do not archive or delete anything.

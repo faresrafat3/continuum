@@ -65,8 +65,19 @@ export default function continuumHandoffPlugin() {
               if (handoff.activeJobs.length > 0) return { kind: 'error', text: 'Continuum cannot fork while background jobs are active; wait for terminal status and reconcile their effects.' }
               if (handoff.goal !== null && handoff.goal.phase !== 'complete') return { kind: 'error', text: 'Continuum cannot fork while the current goal is ' + handoff.goal.phase + '; preserve it in a handoff or resolve it through the authorized goal flow first.' }
               const previous = forkResults.get(key)
-              if (previous !== undefined) return { kind: 'success', text: previous + '\n\nIdempotent replay: no second child was created.' }
-              const child = await ctx.sessionController.fork({ sessionId: invocation.agent.id })
+              if (previous !== undefined) {
+                if (previous.state === 'verified') return { kind: 'success', text: previous.text + '\\n\\nIdempotent replay: no second child was created.' }
+                if (previous.state === 'unverified') return { kind: 'error', text: 'Child Session ' + previous.childId + ' already exists but recovery verification is pending; parent retained and no second child will be created.' }
+                return { kind: 'error', text: 'A previous fork outcome is unknown; inspect the Workspace before retrying. No second child will be created.' }
+              }
+              forkResults.set(key, { state: 'unknown', childId: null })
+              let child
+              try {
+                child = await ctx.sessionController.fork({ sessionId: invocation.agent.id })
+              } catch (error) {
+                return { kind: 'error', text: 'Fork outcome is unknown; inspect the Workspace before retrying. ' + (error instanceof Error ? error.message : String(error)) }
+              }
+              forkResults.set(key, { state: 'unverified', childId: String(child.sessionId) })
               try {
                 const inspection = await ctx.sessionController.inspect(child.sessionId)
                 if (String(inspection.meta.id) !== String(child.sessionId)) throw new Error('fork child identity mismatch')
@@ -76,8 +87,8 @@ export default function continuumHandoffPlugin() {
               } catch (error) {
                 return { kind: 'error', text: 'Child Session ' + String(child.sessionId) + ' was created but recovery verification failed; parent retained. ' + (error instanceof Error ? error.message : String(error)) }
               }
-              const text = 'Created and verified child Session ' + String(child.sessionId) + '.\n\n' + handoff.prompt + '\n\nParent retained for rollback. Archive was not performed.'
-              forkResults.set(key, text)
+              const text = 'Created and verified child Session ' + String(child.sessionId) + '.\\n\\n' + handoff.prompt + '\\n\\nParent retained for rollback. Archive was not performed.'
+              forkResults.set(key, { state: 'verified', childId: String(child.sessionId), text })
               return { kind: 'success', text }
             } finally {
               forkInFlight = false

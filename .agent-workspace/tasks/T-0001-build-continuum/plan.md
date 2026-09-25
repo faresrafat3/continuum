@@ -37,7 +37,7 @@ Build the smallest portable operating protocol first. Keep DSH Host state untouc
 - validation: [fork boundary, recovery, authorization, duplicate-effect tests]
 
 ### P-6 — Acceptance and handoff
-- depends_on: [P-2, P-3, P-4]
+- depends_on: [P-2, P-3, P-4, P-5]
 - touches: [validation.md, state.yaml, handoffs/]
 - expected_result: evidence-backed closeout and exact next action.
 - validation: [repo-fast, fresh-session recovery review]

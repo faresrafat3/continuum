@@ -21,7 +21,7 @@ working_tree: intentional-dirty
 dirty_paths: [README.md, AGENTS.md, WORKSPACE.md, .agent-workspace/, plugins/]
 validation:
   status: partial
-  run_ids: [RUN-20260925-0500Z, RUN-20260925-0545Z, RUN-20260925-0610Z, RUN-20260925-0630Z, RUN-20260925-0640Z]
+  run_ids: [RUN-20260925-0500Z, RUN-20260925-0545Z, RUN-20260925-0600Z, RUN-20260925-0610Z, RUN-20260925-0630Z, RUN-20260925-0640Z]
 latest_handoff: H-20260925-002
 blockers:
   - "Client-specific visual action is not mounted; the safe human /continuum-fork command and existing explicit Workspace archive UI are the supported paths."

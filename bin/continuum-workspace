@@ -21,7 +21,7 @@ VERSION = "1.0"
 TASK_RE = re.compile(r"^T-\d{4}$")
 RESEARCH_RE = re.compile(r"^RES-\d{4}$")
 DECISION_RE = re.compile(r"^ADR-\d{4}$")
-ID_RE = re.compile(r"\b(?:T|RES|ADR)-\d{4}\b")
+ID_RE = re.compile(r"\b(?:T|RES|ADR)-\d{4}\b|\bRUN-[A-Z0-9-]+\b|\bH-\d{8}-\d{3}\b")
 SECRET_RE = re.compile(
     r"(?i)(sk-[A-Za-z0-9_-]{12,}|api[_-]?key\s*[:=]\s*[^\s#]+|token\s*[:=]\s*[^\s#]+|password\s*[:=]\s*[^\s#]+)"
 )
@@ -187,7 +187,7 @@ def init_workspace(args: argparse.Namespace) -> int:
             if not path.exists():
                 path.mkdir(parents=True, exist_ok=True)
                 created.append(relative)
-    scopes_extra = "" if args.layout != "monorepo" else "  - id: projects\n    path: projects\n    kind: namespace\n    package: null\n    depends_on: []\n"
+    scopes_extra = "" if args.layout != "monorepo" else "  - id: projects\n    path: .agent-workspace/projects\n    kind: namespace\n    package: null\n    depends_on: []\n"
     manifest = f"""schema_version: 1
 kind: WorkspaceManifest
 id: {slug}
@@ -380,6 +380,69 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
     return errors, warnings
 
 
+def scope_graph_errors(root: Path, manifest: Path) -> list[str]:
+    try:
+        import yaml
+    except Exception:
+        return []
+    try:
+        data = yaml.safe_load(text(manifest)) or {}
+    except Exception as error:
+        return [f"cannot parse scope graph: {error}"]
+    scopes = data.get("scopes", [])
+    if not isinstance(scopes, list) or not scopes:
+        return ["workspace manifest has no scopes"]
+    errors: list[str] = []
+    ids: set[str] = set()
+    graph: dict[str, list[str]] = {}
+    for scope in scopes:
+        if not isinstance(scope, dict):
+            errors.append("scope entry is not an object")
+            continue
+        scope_id = scope.get("id")
+        if not isinstance(scope_id, str) or not scope_id:
+            errors.append("scope entry has no id")
+            continue
+        if scope_id in ids:
+            errors.append(f"duplicate scope id: {scope_id}")
+        ids.add(scope_id)
+        scope_path = scope.get("path")
+        if not isinstance(scope_path, str) or not scope_path:
+            errors.append(f"scope has no path: {scope_id}")
+        else:
+            candidate = Path(scope_path)
+            if candidate.is_absolute() or ".." in candidate.parts:
+                errors.append(f"scope path is not repository-relative: {scope_id}")
+            elif not (root / candidate).exists():
+                errors.append(f"scope path does not exist: {scope_id} -> {scope_path}")
+        dependencies = scope.get("depends_on", []) or []
+        if not isinstance(dependencies, list):
+            errors.append(f"scope dependencies are not a list: {scope_id}")
+            dependencies = []
+        graph[scope_id] = [str(item) for item in dependencies]
+    for scope_id, dependencies in graph.items():
+        for dependency in dependencies:
+            if dependency not in ids:
+                errors.append(f"scope {scope_id} depends on unknown scope {dependency}")
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    def visit(node: str) -> None:
+        if node in visiting:
+            errors.append(f"scope dependency cycle reaches {node}")
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        for dependency in graph.get(node, []):
+            if dependency in graph:
+                visit(dependency)
+        visiting.remove(node)
+        visited.add(node)
+    for node in graph:
+        visit(node)
+    return errors
+
+
 def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -402,7 +465,10 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 if not (root / relative).exists(): errors.append(f"full mode missing: {relative}")
         if layout == "monorepo" and not (root / ".agent-workspace" / "projects").is_dir():
             errors.append("monorepo layout missing .agent-workspace/projects")
+        errors.extend(scope_graph_errors(root, manifest))
     task_ids: set[str] = set()
+    run_ids: set[str] = set()
+    handoff_ids: set[str] = set()
     research_ids: set[str] = set()
     decision_ids: set[str] = set()
     tasks = discover_tasks(root)
@@ -418,6 +484,8 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             task_ids.add(task_id)
         if task.is_file():
             body = text(task)
+            if not body.startswith("---\n") or not re.search(r"^id:\s*T-\d{4}\s*$", body, re.MULTILINE):
+                errors.append(f"minimal task missing typed frontmatter/id: {task.relative_to(root)}")
             for heading in ["## Goal", "## Acceptance", "## Plan", "## State", "## Validation", "## Handoffs"]:
                 if heading not in body:
                     errors.append(f"minimal task missing {heading}: {task.relative_to(root)}")
@@ -444,12 +512,41 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 errors.append(f"task/state status mismatch in {task.relative_to(root)}: {task_status} != {state_status}")
             validation_text = text(task / "validation.md") if (task / "validation.md").exists() else ""
             declared_runs = set(re.findall(r"\bRUN-[A-Z0-9-]+\b", validation_text))
+            run_ids.update(declared_runs)
             state_runs = set(re.findall(r"\bRUN-[A-Z0-9-]+\b", text(state)))
             missing_runs = sorted(state_runs - declared_runs)
             if missing_runs:
                 errors.append(f"state run ids missing from validation ledger in {task.relative_to(root)}: {missing_runs}")
             if task_id:
                 dependency_graph[task_id] = list_field(record, "depends_on")
+        handoff_dir = task / "handoffs"
+        if handoff_dir.exists():
+            for handoff in sorted(handoff_dir.glob("*.md")):
+                raw = text(handoff)
+                match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", raw, re.MULTILINE)
+                if match is None:
+                    errors.append(f"handoff has no valid id: {handoff.relative_to(root)}")
+                elif match.group(1) in handoff_ids:
+                    errors.append(f"duplicate handoff id: {match.group(1)}")
+                else:
+                    handoff_ids.add(match.group(1))
+                run_ids.update(re.findall(r"\bRUN-[A-Z0-9-]+\b", raw))
+        events = task / "events.ndjson"
+        if events.exists():
+            previous_revision = 0
+            for line_number, line in enumerate(text(events).splitlines(), 1):
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError as error:
+                    errors.append(f"invalid event JSON at {events.relative_to(root)}:{line_number}: {error}")
+                    continue
+                if not isinstance(event, dict) or event.get("schema_version") != 1 or event.get("task_id") != task_id:
+                    errors.append(f"invalid event identity at {events.relative_to(root)}:{line_number}")
+                revision = event.get("state_revision") if isinstance(event, dict) else None
+                if not isinstance(revision, int) or revision < previous_revision:
+                    errors.append(f"invalid event revision at {events.relative_to(root)}:{line_number}")
+                elif isinstance(revision, int):
+                    previous_revision = revision
     for directory, prefix, target in [
         (root / ".agent-workspace" / "research", "RES", research_ids),
         (root / ".agent-workspace" / "decisions", "ADR", decision_ids),
@@ -492,6 +589,8 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 if ref.startswith("T-") and ref not in task_ids: errors.append(f"broken task reference {ref} in {file_path.relative_to(root)}")
                 if ref.startswith("RES-") and ref not in research_ids: errors.append(f"broken research reference {ref} in {file_path.relative_to(root)}")
                 if ref.startswith("ADR-") and ref not in decision_ids: errors.append(f"broken decision reference {ref} in {file_path.relative_to(root)}")
+                if ref.startswith("RUN-") and ref not in run_ids: errors.append(f"unknown validation run reference {ref} in {file_path.relative_to(root)}")
+                if re.match(r"^H-\d{8}-\d{3}$", ref) and ref not in handoff_ids: errors.append(f"unknown handoff reference {ref} in {file_path.relative_to(root)}")
     git = git_identity(root)
     if git.get("root") is None:
         warnings.append("workspace is not inside a readable Git repository")
@@ -502,6 +601,14 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if not notes.exists() or not sources.exists():
             errors.append(f"full research record missing notes/sources: {research_yaml.relative_to(root)}")
             continue
+        status_value = scalar(research_yaml, "status")
+        review_by = scalar(research_yaml, "review_by")
+        if status_value == "verified" and review_by:
+            try:
+                if datetime.fromisoformat(review_by.replace("Z", "+00:00")).date() < datetime.now(timezone.utc).date():
+                    errors.append(f"verified research is stale; review_by={review_by}: {research_yaml.relative_to(root)}")
+            except ValueError:
+                errors.append(f"invalid research review_by: {research_yaml.relative_to(root)}")
         claim_ids = set(re.findall(r"\bC-\d+\b|\bC\d+\b", text(notes)))
         source_ids = set(re.findall(r"\bid:\s*(S[^\s]+)", text(sources)))
         for claim in claim_ids:
@@ -510,6 +617,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         for source in source_ids:
             if source not in text(notes) and source not in text(research_yaml):
                 warnings.append(f"research source is not referenced by notes: {source}")
+    for task, record in task_records:
         if record is None or not (task / "state.yaml").exists():
             continue
         state = task / "state.yaml"
@@ -582,8 +690,8 @@ def context(args: argparse.Namespace) -> int:
     root = Path(args.root or ".").expanduser().resolve()
     task_id = args.task_id
     task = next((p for p in discover_tasks(root) if task_name_id(p) == task_id), None)
-    if task is None:
-        print(json.dumps({"ok": False, "error": f"unknown task {task_id}"}))
+    if task is None or task.is_symlink():
+        print(json.dumps({"ok": False, "error": f"unknown or symlinked task {task_id}"}))
         return 1
     base = task if task.is_dir() else task.parent
     ordered: list[Path] = [task if task.is_file() else base / "task.yaml"]

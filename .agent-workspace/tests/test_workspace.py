@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -84,7 +85,7 @@ class WorkspaceCliTests(unittest.TestCase):
             root = Path(temp)
             self.assertEqual(run("--root", str(root), "init").returncode, 0)
             task = root / ".agent-workspace" / "tasks" / "T-0001-minimal.md"
-            task.write_text("# Minimal task\n\n## Goal\n\nGoal\n\n## Acceptance\n\nAC\n\n## Plan\n\nPlan\n\n## State\n\nin_progress\n\n## Validation\n\nnot_run\n\n## Handoffs\n\nnone\n", encoding="utf-8")
+            task.write_text("---\nschema_version: 1\nkind: Task\nid: T-0001\nslug: minimal\ntitle: Minimal task\ntype: feature\nstatus: in_progress\npriority: p2\nprimary_scope: root\naffected_scopes: [root]\ndepends_on: []\nrelated:\n  research: []\n  decisions: []\n---\n\n# Minimal task\n\n## Goal\n\nGoal\n\n## Acceptance\n\nAC\n\n## Plan\n\nPlan\n\n## State\n\nin_progress\n\n## Validation\n\nnot_run\n\n## Handoffs\n\nnone\n", encoding="utf-8")
             status = run("--root", str(root), "status")
             self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
             self.assertEqual(json.loads(status.stdout)["tasks"][0]["task"], "T-0001")
@@ -151,6 +152,44 @@ class WorkspaceCliTests(unittest.TestCase):
             result = run("--root", str(root), "close", "T-0001", "--dry-run")
             self.assertEqual(result.returncode, 1)
             self.assertFalse(json.loads(result.stdout)["ok"])
+
+    def test_scope_graph_rejects_unknown_duplicate_and_cycles(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init", "--layout", "monorepo").returncode, 0)
+            manifest = root / ".agent-workspace" / "workspace.yaml"
+            text_value = manifest.read_text(encoding="utf-8")
+            project_scope = "  - id: projects\n    path: .agent-workspace/projects\n    kind: namespace\n    package: null\n    depends_on: []\n"
+            duplicate_scope = "  - id: root\n    path: .\n    kind: duplicate\n    depends_on: []\n"
+            text_value = text_value.replace(project_scope, project_scope + duplicate_scope, 1)
+            text_value = text_value.replace("    depends_on: []\npolicy:", "    depends_on: [ghost]\npolicy:", 1)
+            manifest.write_text(text_value, encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1)
+            data = json.loads(doctor.stdout)
+            joined = "\n".join(data["errors"])
+            self.assertIn("unknown scope", joined)
+            self.assertIn("duplicate scope", joined)
+
+    def test_full_research_without_tasks_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init", "--mode", "full").returncode, 0)
+            source = ROOT / ".agent-workspace" / "research" / "RES-0001-context-engineering"
+            target = root / ".agent-workspace" / "research" / "RES-0001-context-engineering"
+            shutil.copytree(source, target)
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertNotIn("Traceback", doctor.stderr)
+            self.assertIn(doctor.returncode, [0, 1])
+
+    def test_minimal_task_without_frontmatter_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            (root / ".agent-workspace" / "tasks" / "T-0001-minimal.md").write_text("# Minimal\n\n## Goal\n\nG\n\n## Acceptance\n\nA\n\n## Plan\n\nP\n\n## State\n\nS\n\n## Validation\n\nV\n\n## Handoffs\n\nH\n", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1)
+            self.assertIn("frontmatter", doctor.stdout)
 
     def test_close_is_dry_run_only(self):
         with tempfile.TemporaryDirectory() as temp:

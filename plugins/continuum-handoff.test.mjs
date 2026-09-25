@@ -15,6 +15,7 @@ let jobRows = []
 let goalView
 let forkCalls = 0
 let missingServices = false
+let inspectFailures = 0
 const ctx = {
   get(name) {
     if (missingServices) return undefined
@@ -44,7 +45,10 @@ const ctx = {
       await new Promise(resolve => setTimeout(resolve, 5))
       return { sessionId: 'child-session' }
     },
-    async inspect(id) { return { meta: { id: String(id), cwd: '/tmp/example', agentPreset: 'continuum' } } }
+    async inspect(id) {
+      if (inspectFailures > 0) { inspectFailures -= 1; throw new Error('temporary inspect failure') }
+      return { meta: { id: String(id), cwd: '/tmp/example', agentPreset: 'continuum' } }
+    }
   }
 }
 
@@ -106,6 +110,13 @@ const idempotent = await fork.handler({ agent, rawInput: ' T-0002 ' })
 assert.equal(idempotent.kind, 'success')
 assert.match(idempotent.text, /Idempotent replay/)
 assert.equal(forkCalls, 2)
+inspectFailures = 1
+const firstInspectFailure = await fork.handler({ agent, rawInput: ' T-0004 ' })
+assert.equal(firstInspectFailure.kind, 'error')
+const callsAfterInspectFailure = forkCalls
+const retryAfterInspectFailure = await fork.handler({ agent, rawInput: ' T-0004 ' })
+assert.equal(retryAfterInspectFailure.kind, 'error')
+assert.equal(forkCalls, callsAfterInspectFailure)
 
 jobRows = [{ id: 'job-1', kind: 'test', status: 'running' }]
 const jobBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })

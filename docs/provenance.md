@@ -25,4 +25,4 @@ The project does not modify that checkout, its Host composition, shipped preset 
 - Initial nested checkpoint: `0d2424f32425cd05cb954111c08ce11d3c849167`
 - Final checkpoint: recorded after the last validation pass; see `git rev-parse HEAD` in the final handoff.
 
-Dynamic DSH package `hand-3/pkg-11` is process-local and is intentionally not part of the nested Git commit. Its exact source is retained at `plugins/continuum-handoff.js` and can be recovered with `cordis_inspect_self`.
+Dynamic DSH package `hand-3/pkg-12` is process-local and is intentionally not part of the nested Git commit. Its exact source is retained at `plugins/continuum-handoff.js` and can be recovered with `cordis_inspect_self`.
