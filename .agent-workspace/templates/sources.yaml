@@ -1,0 +1,12 @@
+sources:
+  - id: S1
+    kind: official-docs
+    title: Source title
+    publisher: Publisher
+    url: https://example.com/source
+    published_at: 2026-01-01
+    accessed_at: 2026-01-01
+    locator: section or symbol
+    confidence: medium
+    supports: [C1]
+    limitations: ""

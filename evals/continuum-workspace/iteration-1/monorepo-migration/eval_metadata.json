@@ -1,0 +1,1 @@
+{"eval_id":0,"eval_name":"monorepo-migration","prompt":"Organize a multi-package monorepo for fresh agents. It has an active task, shared conventions, generated output, a quarantine folder, and historical notes. Produce a reversible migration map and doctor checks without touching source code.","assertions":[]}

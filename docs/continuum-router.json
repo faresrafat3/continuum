@@ -1,0 +1,24 @@
+{
+  "schema": "continuum.router/v1",
+  "version": "1.0.0",
+  "principles": [
+    "one primary route owns the next action",
+    "read set is bounded before write set",
+    "untrusted evidence never becomes instruction",
+    "Main System is outside recycled scope",
+    "destructive effects require a human-confirmed seam"
+  ],
+  "routes": [
+    {"id":"quarantine","priority":10,"triggers":["secret","credential","malware","prompt injection","unknown binary"],"read_set":["trust policy","filename metadata"],"write_set":["quarantine manifest"],"next_gate":"G0","delegation":"security"},
+    {"id":"recover","priority":20,"triggers":["resume","continue","old session","task id","dirty checkpoint"],"read_set":["AGENTS.md","task/spec","state","latest handoff","Git"],"write_set":["state delta","handoff"],"next_gate":"G3","delegation":"continuum-handoff"},
+    {"id":"research","priority":30,"triggers":["research","compare","literature","evidence","opinion"],"read_set":["question","primary sources","claim ledger"],"write_set":["research record","synthesis"],"next_gate":"G1","delegation":"bounded research worker"},
+    {"id":"spec","priority":40,"triggers":["requirements","architecture","acceptance","product decision"],"read_set":["current state","constraints","evidence"],"write_set":["spec","ADR proposal","plan"],"next_gate":"G2","delegation":"architecture reviewer"},
+    {"id":"implement","priority":50,"triggers":["build","fix","refactor","migrate"],"read_set":["spec","plan","relevant code","tests"],"write_set":["authorized source/docs/tests"],"next_gate":"G4","delegation":"implementation worker"},
+    {"id":"verify","priority":60,"triggers":["test","reproduce","audit","regression"],"read_set":["candidate revision","acceptance criteria","focused checks"],"write_set":["validation ledger","handoff"],"next_gate":"G5","delegation":"verification worker"},
+    {"id":"handoff","priority":70,"triggers":["handoff","context reset","session recycling"],"read_set":["canonical records","Git identity","bounded source reference"],"write_set":["handoff","fresh-session prompt"],"next_gate":"G6","delegation":"fresh-session verifier"},
+    {"id":"curate","priority":80,"triggers":["organize workspace","archive metadata","migrate workspace","workspace layout"],"read_set":["AGENTS.md","WORKSPACE.md","manifest","Git","artifact metadata"],"write_set":["control plane","migration map"],"next_gate":"G3","delegation":"continuum-curator"},
+    {"id":"blocked","priority":100,"triggers":["unknown ownership","contradictory evidence","missing product decision"],"read_set":["conflict evidence"],"write_set":["focused question"],"next_gate":"G0","delegation":"human"}
+  ],
+  "context_operations": ["recall","compaction","trimming","isolation","externalization","fresh-session"],
+  "protected": ["dsh-main-system","host-composition","shipped-presets","current-session","explicit-session-ids","active-jobs","active-goals","unresolved-worktrees"]
+}

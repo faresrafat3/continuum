@@ -1,0 +1,6 @@
+{"schema_version":1,"at":"2026-09-25T05:00:00Z","type":"task.created","task_id":"T-0001","actor":"agent:continuum","from":null,"to":"intake","state_revision":1}
+{"schema_version":1,"at":"2026-09-25T05:20:00Z","type":"preset.validated","task_id":"T-0001","actor":"agent:continuum","presets":["continuum","continuum-curator"],"state_revision":2}
+{"schema_version":1,"at":"2026-09-25T05:45:00Z","type":"research.published","task_id":"T-0001","actor":"agent:continuum","path":"docs/research/context-engineering-sota-review.md","state_revision":3}
+{"schema_version":1,"at":"2026-09-25T05:46:00Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"specified","to":"in_progress","state_revision":4}
+{"schema_version":1,"at":"2026-09-25T06:15:00Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"in_progress","to":"validating","state_revision":5}
+{"schema_version":1,"at":"2026-09-25T06:15:00Z","type":"handoff.written","task_id":"T-0001","actor":"agent:continuum","handoff_id":"H-20260925-002","state_revision":5}

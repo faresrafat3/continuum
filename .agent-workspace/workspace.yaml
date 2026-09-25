@@ -1,0 +1,25 @@
+schema_version: 1
+kind: WorkspaceManifest
+id: continuum-system
+name: Continuum System
+mode: full
+layout: single
+created_at: 2026-09-25T00:00:00Z
+updated_at: 2026-09-25T05:45:00Z
+default_scope: root
+scopes:
+  - id: root
+    path: .
+    kind: repository
+    package: null
+    depends_on: []
+policy:
+  git:
+    base_branch: main
+    branch_prefix: task/
+    worktree_mode: recommended
+    require_task_branch: true
+  research:
+    require_citations: true
+    default_review_after_days: 180
+extensions: {}

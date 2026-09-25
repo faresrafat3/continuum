@@ -1,0 +1,29 @@
+schema_version: 1
+kind: TaskState
+task_id: T-0000
+state_revision: 1
+as_of: 2026-01-01T00:00:00Z
+status: intake
+phase: discover
+readiness: ready
+active_step: P-1
+next_action: "Define the first verifiable slice."
+execution:
+  mode: read
+  actor: null
+  session_id: null
+  claimed_at: null
+  branch: null
+  worktree: null
+  started_from_commit: null
+last_verified_commit: null
+working_tree: clean
+dirty_paths: []
+validation:
+  status: not_run
+  run_ids: []
+latest_handoff: null
+blockers: []
+decisions_pending: []
+assumptions: []
+extensions: {}

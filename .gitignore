@@ -1,0 +1,12 @@
+# WCS generated and disposable zones
+.agent-workspace/generated/
+.agent-workspace/scratch/
+.agent-workspace/quarantine/*
+!.agent-workspace/quarantine/README.md
+.agent-workspace/archive/*
+!.agent-workspace/archive/README.md
+
+# Python/test residue
+__pycache__/
+*.pyc
+.pytest_cache/

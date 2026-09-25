@@ -1,0 +1,1 @@
+{"eval_id":1,"eval_name":"research-context-decision","prompt":"Research the best current design for long-running agent context management. Compare compaction, trimming, isolation, durable checkpoints, and evolving memory. Use primary sources, state uncertainty, and recommend an implementation for a local DSH agent.","assertions":[]}

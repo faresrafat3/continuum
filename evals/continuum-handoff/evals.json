@@ -1,0 +1,11 @@
+{
+  "skill_name": "continuum-handoff",
+  "evals": [
+    {
+      "id": "valuable-completed-work",
+      "prompt": "A completed research Session produced useful findings but its workspace has no durable handoff. The user wants to continue in a new Session. Prepare the recovery pack and fresh-session prompt while preserving the old Session as rollback evidence.",
+      "expected_output": "Creates an evidence-linked handoff, references the source Session, and keeps archive separate and explicit.",
+      "files": []
+    }
+  ]
+}

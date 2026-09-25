@@ -1,0 +1,11 @@
+{
+  "skill_name": "continuum-workspace",
+  "evals": [
+    {
+      "id": "monorepo-migration",
+      "prompt": "Organize a multi-package monorepo for fresh agents. It has an active task, shared conventions, generated output, a quarantine folder, and historical notes. Produce a reversible migration map and doctor checks without touching source code.",
+      "expected_output": "Scopes, canonical records, trust zones, stable ids, bounded read sets, and no destructive action.",
+      "files": []
+    }
+  ]
+}

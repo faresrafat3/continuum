@@ -1,0 +1,31 @@
+schema_version: 1
+kind: ValidationPolicy
+profiles:
+  repo-fast:
+    steps:
+      - id: workspace-doctor
+        kind: command
+        argv: ["./bin/continuum-workspace", "doctor", "--strict"]
+        cwd: "."
+        timeout_seconds: 60
+        network: false
+        mutation: false
+      - id: unit-tests
+        kind: command
+        argv: ["python3", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-v"]
+        cwd: "."
+        timeout_seconds: 120
+        network: false
+        mutation: false
+  research-links:
+    steps:
+      - id: citation-scan
+        kind: command
+        argv: ["python3", "-m", "unittest", "discover", "-s", ".agent-workspace/tests", "-p", "test_research.py", "-v"]
+        cwd: "."
+        timeout_seconds: 60
+        network: false
+        mutation: false
+scope_requirements:
+  root: [repo-fast]
+extensions: {}

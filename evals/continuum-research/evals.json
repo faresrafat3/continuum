@@ -1,0 +1,11 @@
+{
+  "skill_name": "continuum-research",
+  "evals": [
+    {
+      "id": "memory-framework-comparison",
+      "prompt": "Compare durable agent frameworks and memory systems for a DSH-style local agent. Separate evidence from marketing, cite primary sources, note security and replay trade-offs, and end with a falsifiable experiment.",
+      "expected_output": "Claim/source ledger, framework matrix, contradiction handling, and experiment plan.",
+      "files": []
+    }
+  ]
+}

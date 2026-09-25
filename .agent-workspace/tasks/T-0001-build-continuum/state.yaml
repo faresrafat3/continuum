@@ -1,0 +1,31 @@
+schema_version: 1
+kind: TaskState
+task_id: T-0001
+state_revision: 5
+as_of: 2026-09-25T06:15:00Z
+status: validating
+phase: validate
+readiness: ready
+active_step: P-6
+next_action: "Collect skill evaluation outputs, run the strict doctor and unit tests, then record the acceptance handoff."
+execution:
+  mode: write
+  actor: agent:continuum
+  session_id: session-current
+  claimed_at: 2026-09-25T05:00:00Z
+  branch: task/T-0001-build-continuum
+  worktree: null
+  started_from_commit: null
+last_verified_commit: null
+working_tree: intentional-dirty
+dirty_paths: [README.md, AGENTS.md, WORKSPACE.md, .agent-workspace/, plugins/]
+validation:
+  status: partial
+  run_ids: [RUN-20260925-0500Z, RUN-20260925-0545Z, RUN-20260925-0610Z]
+latest_handoff: H-20260925-002
+blockers:
+  - "Client-specific visual action is not mounted; the safe human /continuum-fork command and existing explicit Workspace archive UI are the supported paths."
+decisions_pending: []
+assumptions:
+  - "The DSH Host/Main System is the control plane and must remain unchanged."
+extensions: {}
