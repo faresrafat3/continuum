@@ -62,10 +62,9 @@ jobs:
           fi
           echo "no deployment or control-plane path is tracked"
 
-      - name: Mutation spot-check
-        # A green suite proves nothing unless the suite can fail. Break one
-        # guard on a scratch copy and require the suite to notice.
-        name: Break a guard and require failure
+      # A green suite proves nothing unless the suite can fail. Break one
+      # guard on a scratch copy and require the suite to notice.
+      - name: Break a guard and require failure
         run: |
           cp bin/continuum-workspace "$RUNNER_TEMP/continuum-workspace.bak"
           python - <<'PY'
