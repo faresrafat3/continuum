@@ -365,6 +365,7 @@ Base undated documentation was accessed on 2026-03-21 and supplemental pages wer
 24. Kuang-Huei Lee et al., [“ReadAgent: A Human-Inspired Reading Agent with Gist Memory of Very Long Contexts”](https://proceedings.mlr.press/v235/lee24c.html), **ICML 2024**.
 25. [“HiAgent: Hierarchical Working Memory Management for Solving Long-Horizon Agent Tasks with Large Language Model”](https://aclanthology.org/2025.acl-long.1575/), **ACL 2025**.
 26. [“R3Mem: Bridging Memory Retention and Retrieval via Reversible Compression”](https://aclanthology.org/2025.findings-acl.235/), **Findings ACL 2025**.
+27. Yiming Du, Wenyu Huang, Danna Zheng, [“Rethinking Memory in LLM based Agents: Representations, Operations, and Emerging Topics”](https://arxiv.org/abs/2505.00675), **arXiv**, submitted 2025-05-01, rechecked 2026-09-26. Survey used for the memory taxonomy and operation framing behind claim C5; it is a preprint survey in a fast-moving area, not durability or safety evidence.
 
 **Additional primary long-context sources:** [RULER, COLM 2024](https://arxiv.org/abs/2404.06654), [HELMET, ICLR 2025](https://arxiv.org/abs/2410.02694), [LongBench, ACL 2024](https://arxiv.org/abs/2308.14508), [∞Bench](https://arxiv.org/abs/2402.13718), [BABILong, NeurIPS 2024 Datasets and Benchmarks](https://arxiv.org/abs/2406.10149), and [RAPTOR, ICLR 2024](https://openreview.net/forum?id=1R6lX1nWwu).
 

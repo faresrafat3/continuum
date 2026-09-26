@@ -56,23 +56,23 @@ sources:
     limitations: "Framework-specific contracts; not DSH benchmarks."
   - id: S6
     kind: paper
-    title: "Rethinking Memory in AI: Taxonomy, Operations, Topics, and Future Directions"
+    title: "Rethinking Memory in LLM based Agents: Representations, Operations, and Emerging Topics"
     publisher: arXiv
     url: https://arxiv.org/abs/2505.00675
     published_at: 2025
-    accessed_at: 2026-09-25
-    locator: "taxonomy and six memory operations"
+    accessed_at: 2026-09-26
+    locator: "Du, Huang, Zheng; taxonomy and six memory operations"
     confidence: medium-high
     supports: [C5]
-    limitations: "Survey; rapidly changing area."
+    limitations: "Survey; rapidly changing area. Title corrected 2026-09-26 after an arXiv title check found the earlier transcription matched no paper."
   - id: S7
     kind: paper
     title: "Memory Injection Attacks on LLM Agents via Query-Only Interaction"
     publisher: NeurIPS
     url: https://arxiv.org/abs/2503.03704
     published_at: 2025
-    accessed_at: 2026-09-25
-    locator: "attack setup and results"
+    accessed_at: 2026-09-26
+    locator: "attack setup and results; NeurIPS 2025 proceedings version at proceedings.neurips.cc/paper_files/paper/2025/hash/42a97bbd9844d2bf68596730af80bcdf"
     confidence: high
     supports: [C5]
     limitations: "Evaluated threat model; not every memory implementation."

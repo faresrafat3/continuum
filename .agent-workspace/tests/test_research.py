@@ -2,11 +2,37 @@ import re
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 REPORT = ROOT / "docs" / "research" / "context-engineering-sota-review.md"
+LEDGER = ROOT / ".agent-workspace" / "research" / "RES-0001-context-engineering" / "sources.yaml"
 
 
 class ResearchReportTests(unittest.TestCase):
+    def test_cited_titles_are_not_mistranscriptions(self):
+        """A ledger title must be the real title, not a plausible paraphrase.
+
+        A `status: verified` ledger that mis-transcribes a paper title sends a
+        reader searching for a paper that does not exist. Two independent title
+        checks caught real defects in this ledger, so the invariant is pinned.
+        """
+        text = REPORT.read_text(encoding="utf-8").lower()
+        ledger = yaml.safe_load(LEDGER.read_text(encoding="utf-8"))
+        sources = ledger.get("sources") or []
+        self.assertGreaterEqual(len(sources), 5)
+        for source in sources:
+            title = str(source.get("title", "")).strip()
+            self.assertTrue(title, f"source {source.get('id')} has no title")
+            if source.get("kind") != "paper":
+                continue
+            head = title.split(":")[0].strip().lower()
+            self.assertIn(
+                head, text,
+                f"source {source.get('id')} title {title!r} is not traceable to the research report")
+            for banned in ("rethinking memory in ai: taxonomy",):
+                self.assertNotIn(banned, title.lower(), f"source {source.get('id')} carries a mis-transcribed title")
+
     def test_report_has_decision_sections_and_primary_links(self):
         text = REPORT.read_text(encoding="utf-8")
         for heading in [
