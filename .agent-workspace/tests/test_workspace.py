@@ -667,6 +667,22 @@ class WorkspaceCliTests(unittest.TestCase):
             doctor = run("--root", str(root), "doctor", "--strict")
             self.assertEqual(doctor.returncode, 0, doctor.stdout)
 
+    def test_unknown_commit_is_not_reported_as_a_broken_ancestor_chain(self):
+        """A shallow clone cannot see history; it must say so, not accuse."""
+        source = {"__name__": "continuum_workspace_under_test"}
+        exec(compile(CLI.read_text(encoding="utf-8"), str(CLI), "exec"), source)
+        git_commit_known = source["git_commit_known"]
+        git_is_ancestor = source["git_is_ancestor"]
+        repo = Path(__file__).resolve().parents[2]
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                              capture_output=True, check=False).stdout.strip()
+        self.assertTrue(head, "the test repository must have a HEAD")
+        self.assertTrue(git_commit_known(repo, head), "HEAD must be a known commit")
+        self.assertFalse(git_commit_known(repo, "0" * 40), "an absent commit must be unknown")
+        # An unknown commit must not be silently treated as "not an ancestor".
+        self.assertFalse(git_is_ancestor(repo, "0" * 40, head))
+        self.assertTrue(git_is_ancestor(repo, head, head))
+
     def test_handoff_with_empty_section_bodies_is_rejected(self):
         """A heading is not a section. Structural completeness must not pass a hollow handoff."""
         with tempfile.TemporaryDirectory() as temp:

@@ -232,10 +232,25 @@ def git_identity(root: Path) -> dict[str, object]:
     }
 
 
+def git_commit_known(root: Path, revision: str) -> bool:
+    """Whether a revision exists in the local object store.
+
+    A shallow clone does not have the history, so an unknown commit must not
+    be reported as a broken ancestor chain.
+    """
+    import subprocess
+    try:
+        return subprocess.run(
+            ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+            cwd=root, check=False, timeout=5, capture_output=True).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def git_is_ancestor(root: Path, older: str, newer: str) -> bool:
     import subprocess
     try:
-        return subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=root, check=False, timeout=5).returncode == 0
+        return subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=root, check=False, timeout=5, capture_output=True).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -1242,8 +1257,14 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             errors.append(f"task branch policy is not satisfied in {state.relative_to(root)}")
         if declared_branch and git.get("branch") and declared_branch != git.get("branch"):
             errors.append(f"state branch does not match Git branch in {state.relative_to(root)}")
-        if declared_head and declared_head not in {"HEAD", "self"} and git.get("head") and declared_head != git.get("head") and not git_is_ancestor(root, declared_head, str(git.get("head"))):
-            warnings.append(f"state verified commit is not an ancestor of current Git HEAD in {state.relative_to(root)}")
+        if declared_head and declared_head not in {"HEAD", "self"} and git.get("head") and declared_head != git.get("head"):
+            if git_commit_known(root, declared_head):
+                if not git_is_ancestor(root, declared_head, str(git.get("head"))):
+                    warnings.append(f"state verified commit is not an ancestor of current Git HEAD in {state.relative_to(root)}")
+            else:
+                # A shallow or partial clone cannot see this commit. Say so
+                # once, rather than reporting a false broken history.
+                warnings.append(f"state verified commit {declared_head[:12]} is not in this clone; run 'git fetch --unshallow' to check the ancestor chain in {state.relative_to(root)}")
         if scalar(state, "working_tree") == "clean":
             status_lines = str(git.get("status") or "").splitlines()
             if any(str(state.relative_to(root)) in line for line in status_lines):
