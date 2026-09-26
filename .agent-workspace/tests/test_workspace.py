@@ -492,6 +492,20 @@ class WorkspaceCliTests(unittest.TestCase):
         manifest_path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
     def test_package_scopes_match_supported_manifests(self):
+        # TOML ecosystems need tomllib, which is 3.11+. On an older
+        # interpreter they must be reported as unavailable, not skipped.
+        if sys.version_info < (3, 11):
+            with tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                manifest = self._monorepo(root)
+                (root / "api").mkdir()
+                (root / "api" / "pyproject.toml").write_text(
+                    '[project]\nname = "acme-api"\ndependencies = ["httpx>=0.27"]\n', encoding="utf-8")
+                self._add_scope(manifest, "api", "api", "service", "python:acme-api")
+                doctor = run("--root", str(root), "doctor", "--strict")
+                self.assertEqual(doctor.returncode, 1, doctor.stdout)
+                self.assertIn("TOML support requires Python 3.11+", doctor.stdout)
+            return
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             manifest = self._monorepo(root)

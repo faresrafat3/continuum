@@ -672,7 +672,18 @@ PACKAGE_KINDS = {"application", "service", "library", "package"}
 
 
 def _toml_load(text_value: str) -> dict:
-    import tomllib
+    """Parse TOML with the standard library.
+
+    tomllib is 3.11+. On an older interpreter the TOML ecosystems are
+    reported as unavailable rather than silently skipped, so a Python or
+    Cargo scope can never pass validation because its manifest went unread.
+    """
+    try:
+        import tomllib
+    except ModuleNotFoundError as error:
+        raise ValueError(
+            f"cannot parse package manifest: TOML support requires Python 3.11+ ({error})"
+        ) from error
     return tomllib.loads(text_value)
 
 

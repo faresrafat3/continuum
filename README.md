@@ -30,7 +30,7 @@ rather than quietly accepted.
 |---|---|
 | `continuum` | context-engineering, research, routing, handoff |
 | `continuum-curator` | workspace governance and safe migration |
-| `bin/continuum-workspace` | dependency-free CLI: `init`, `doctor --strict`, `status`, `context`, `close --dry-run` |
+| `bin/continuum-workspace` | dependency-free CLI: `init`, `doctor --strict`, `status`, `context`, `close --dry-run` (Python 3.10+; 3.11+ for the monorepo TOML package scopes) |
 | `plugins/continuum-handoff.js` | source of record for the process-local `hand-3/pkg-14` Host package |
 | `bench/benchmark.py` | reproducible local benchmark, no API |
 | `docs/landscape.md` | honest comparison, including the reasons not to use this |

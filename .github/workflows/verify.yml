@@ -119,5 +119,7 @@ jobs:
 
       - name: Local benchmark smoke
         # Timings are machine-specific and are not asserted; this only proves
-        # the benchmark runs.
+        # the benchmark runs. Skipped on the no-validators leg, because the
+        # benchmark's own doctor calls are expected to fail there.
+        if: ${{ !matrix.no-extras }}
         run: python -B bench/benchmark.py --quick --repeats 2
