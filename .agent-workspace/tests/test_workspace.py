@@ -267,13 +267,25 @@ class WorkspaceCliTests(unittest.TestCase):
             "state_revision: " + str(revision) + "\n"
             "checkpoint:\n  commit: null\n  tree_state: clean\n  validation_run_ids: []\n"
             "workspace:\n  root: null\n  git_head: null\n  branch: main\n  dirty_paths: []\n"
-            "objective: Recover the task\nnext_action: Verify the checkpoint\nblockers: []\nsections:\n"
+            "objective: Deliver the guarded recovery path so a fresh session can resume this task\nnext_action: Run the doctor and confirm zero errors\nblockers: []\nsections:\n"
             + "".join("  - " + heading + "\n" for heading in headings)
             + "---\n\nSource Session: @[session-test]\n\n"
         )
+        bodies = {
+            "Objective and acceptance target": "Deliver the guarded recovery path so a fresh session can resume this task without redoing completed work.",
+            "Confirmed facts and read set": "The nested repository is clean at the recorded commit and the workspace manifest declares a single root scope.",
+            "Completed": "The CLI, its schemas, the doctor checks, and the unit suite were written and verified against scratch copies.",
+            "Current operation": "The handoff is being regenerated so the generated context pack matches the current state revision.",
+            "Exact next action": "Run the doctor and confirm zero errors before editing any record.",
+            "Decisions/spec/plan changes": "The recorded decision keeps the host control plane immutable and treats fork and seal as proposed synthesis.",
+            "Validation evidence": "The unit suite, the node regression, and the strict doctor all pass on a clean tree at this commit.",
+            "Blockers and questions": "No blocker remains open; the deferred crash boundary gates are recorded as deferred rather than passed.",
+            "Do not repeat / safe shortcuts": "Never rewrite a historical ledger row to match today's numbers and never archive from a model instruction.",
+            "Stale or contradictory information": "Earlier handoffs cite older revisions and are superseded by this record for every current claim.",
+            "Working tree and uncommitted paths": "The tree was clean at the recorded checkpoint; verify the head and status on disk before editing.",
+        }
         return front + "".join(
-            "# " + heading + "\n\nRecorded evidence for the " + heading.lower() + " section of " + handoff_id + ".\n\n"
-            for heading in headings)
+            "# " + heading + "\n\n" + bodies[heading] + "\n\n" for heading in headings)
 
     def _seed_task_with_handoff(self, root, latest_handoff, revision=2):
         task = root / ".agent-workspace" / "tasks" / "T-0001-demo"
@@ -369,6 +381,95 @@ class WorkspaceCliTests(unittest.TestCase):
             self.assertEqual(doctor.returncode, 1, doctor.stdout)
             self.assertIn("schema validation failed", doctor.stdout)
 
+    def test_handoff_may_document_a_deliberately_removed_path(self):
+        """The stale-information section exists to say "this was removed".
+
+        Rejecting that would penalise correct behaviour, so a reference
+        surrounded by removal language is exempt from the existence check.
+        """
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            handoffs = task / "handoffs"
+            handoffs.mkdir()
+            solid = handoffs / "H-20260101-001.md"
+            solid.write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+            solid.write_text(
+                solid.read_text(encoding="utf-8")
+                + "\nThe old plan lived at ./docs/v1-plan.md, which was removed in the later checkpoint.\n",
+                encoding="utf-8")
+            baseline = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(baseline.returncode, 0, baseline.stdout)
+            # The same path asserted as current is still an error.
+            solid.write_text(
+                solid.read_text(encoding="utf-8") + "\nRun ./docs/v1-plan.md before continuing.\n", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("handoff references a path that does not exist", doctor.stdout)
+
+    def _done_task_with_ledger(self, root, ledger_body, validation_status="pass"):
+        task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+        (task / "handoffs").mkdir()
+        (task / "handoffs" / "H-20260101-001.md").write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+        (task / "validation.md").write_text(ledger_body, encoding="utf-8")
+        (task / "state.yaml").write_text(
+            "schema_version: 1\nkind: TaskState\ntask_id: T-0001\nstate_revision: 2\n"
+            "status: done\nphase: review\nreadiness: ready\nnext_action: Run the doctor check\n"
+            "working_tree: clean\ndirty_paths: []\n"
+            f"validation:\n  status: {validation_status}\n  run_ids: [RUN-20260101-0900Z]\n"
+            "latest_handoff: H-20260101-001\nexecution:\n  mode: read\n  actor: agent:test\n", encoding="utf-8")
+        (task / "task.yaml").write_text(
+            "schema_version: 1\nkind: Task\nid: T-0001\nslug: demo\ntitle: Demo\ntype: feature\n"
+            "status: done\npriority: p2\nprimary_scope: root\naffected_scopes: [root]\n"
+            "depends_on: []\nrelated:\n  research: []\n  decisions: []\n", encoding="utf-8")
+        return task
+
+    def test_fail_row_is_detected_in_every_ledger_form(self):
+        header = (
+            "# Validation\n\n| Run | Time | Gate | Git identity | Result | Evidence |\n|---|---|---|---|---|---|\n"
+            "| RUN-20260101-0900Z | 2026-01-01T09:00Z | unit | clean | pass | the doctor failed once then passed |\n")
+        for result in ["fail", "FAIL", "failed", "partial", "**fail**", "**FAIL**"]:
+            with self.subTest(result=result):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    self.assertEqual(run("--root", str(root), "init").returncode, 0)
+                    self._done_task_with_ledger(root, header)
+                    # 'fail' inside a passing row's evidence must not trip the gate.
+                    baseline = run("--root", str(root), "doctor", "--strict")
+                    self.assertEqual(baseline.returncode, 0, baseline.stdout)
+                    ledger = root / ".agent-workspace" / "tasks" / "T-0001-demo" / "validation.md"
+                    with ledger.open("a", encoding="utf-8") as handle:
+                        handle.write(f"| RUN-20260101-1000Z | 2026-01-01T10:00Z | unit | clean | {result} | broke |\n")
+                    doctor = run("--root", str(root), "doctor", "--strict")
+                    self.assertEqual(doctor.returncode, 1, f"{result} not detected: {doctor.stdout}")
+                    self.assertIn("validation ledger records a failed run while state claims pass", doctor.stdout)
+
+    def test_deeper_nested_status_cannot_shadow_validation_status(self):
+        """nested_scalar must read the shallowest child so the gate fails closed."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            (task / "handoffs").mkdir()
+            (task / "handoffs" / "H-20260101-001.md").write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+            (task / "validation.md").write_text(
+                "# Validation\n\n| Run | Time | Gate | Git identity | Result | Evidence |\n|---|---|---|---|---|---|\n"
+                "| RUN-20260101-1000Z | 2026-01-01T10:00Z | unit | clean | fail | broke |\n", encoding="utf-8")
+            (task / "state.yaml").write_text(
+                "schema_version: 1\nkind: TaskState\ntask_id: T-0001\nstate_revision: 2\n"
+                "status: done\nphase: review\nreadiness: ready\nnext_action: Run the doctor check\n"
+                "working_tree: clean\ndirty_paths: []\n"
+                "validation:\n  gate:\n    status: partial\n  status: pass\n  run_ids: [RUN-20260101-1000Z]\n"
+                "latest_handoff: H-20260101-001\nexecution:\n  mode: read\n  actor: agent:test\n", encoding="utf-8")
+            (task / "task.yaml").write_text(
+                "schema_version: 1\nkind: Task\nid: T-0001\nslug: demo\ntitle: Demo\ntype: feature\n"
+                "status: done\npriority: p2\nprimary_scope: root\naffected_scopes: [root]\n"
+                "depends_on: []\nrelated:\n  research: []\n  decisions: []\n", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("validation ledger records a failed run while state claims pass", doctor.stdout)
+
     def test_handoff_with_empty_section_bodies_is_rejected(self):
         """A heading is not a section. Structural completeness must not pass a hollow handoff."""
         with tempfile.TemporaryDirectory() as temp:
@@ -390,7 +491,7 @@ class WorkspaceCliTests(unittest.TestCase):
             solid.write_text(f"---\n{front}\n---\n{hollow}", encoding="utf-8")
             doctor = run("--root", str(root), "doctor", "--strict")
             self.assertEqual(doctor.returncode, 1, doctor.stdout)
-            self.assertIn("handoff section is empty or not actionable", doctor.stdout)
+            self.assertIn("handoff section carries no information", doctor.stdout)
 
     def test_handoff_next_action_must_be_actionable(self):
         with tempfile.TemporaryDirectory() as temp:

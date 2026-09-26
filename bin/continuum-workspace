@@ -61,17 +61,28 @@ def is_actionable(value: str) -> bool:
     candidate = str(value or "").strip()
     if len(candidate) < 12:
         return False
-    if candidate.rstrip(".!").lower() in VAGUE_NEXT_ACTIONS:
+    # Normalise before the blacklist so "Do the `thing`" and "continue
+    # the Work!" cannot slip past on punctuation or code formatting.
+    plain = re.sub(r"[`'\"]", "", candidate).lower()
+    plain = re.sub(r"[^a-z0-9 ]+", " ", plain)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    if plain in VAGUE_NEXT_ACTIONS or plain in {f"do the {word}" for word in ("thing", "work", "it", "that", "next")}:
         return False
-    if re.search(r"(?<![\w/.-])((?:\./)?(?:bin|docs|plugins|presets|evals|\.agent-workspace)/[\w./-]+)", candidate):
-        return True
-    if re.search(r"\b(?:T-\d{4}|H-\d{8}-\d{3}|RUN-[A-Z0-9-]+|ADR-\d{4}|RES-\d{4}|S\d+)\b", candidate):
+    if re.search(r"\b(?:T-\d{4}|H-\d{8}-\d{3}|RUN-[A-Z0-9-]+|ADR-\d{4}|RES-\d{4})\b", candidate):
         return True
     if re.search(r"`[^`]+`", candidate):
         return True
-    if re.search(r"(?:run|read|open|execute|invoke|rebuild|regenerate|verify|check|inspect|re-run|rerun)\b", candidate, re.I):
-        return True
-    return False
+    # Both boundary anchors matter: \b only at the end makes `read` match
+    # inside "thread". A recognised action verb is sufficient; a path or id
+    # on its own is a reference, not an instruction.
+    return bool(re.search(
+        r"\b(?:runs?|reads?|opens?|execut\w+|invok\w+|rebuild\w*|regenerat\w+|verif\w+|check\w*|inspect\w*|"
+        r"re-?runs?|updat\w+|edit\w*|writ\w+|adds?|remov\w+|delet\w+|fix(?:es|ed)?|review\w*|await\w*|wait\w*|"
+        r"tests?|document\w*|refactor\w*|renam\w*|mov(?:e|es|ed)?|appl(?:y|ies|ied)|clos(?:e|es|ed)|"
+        r"reconcil\w*|migrat\w*|publish\w*|commits?|push(?:es|ed)?|look\s+at|examin\w+|consult\w*|fetch\w*|"
+        r"pull(?:s|ed)?|follow\w*|continue\s+with|starts?|begins?|finishes?|land(?:s|ed)?|ships?|"
+        r"replac\w+|creat\w+|generat\w+|sort\w*|order\w*|plan\s+the|prepare\b)\b",
+        candidate, re.I))
 
 
 REQUIRED = [
@@ -122,14 +133,21 @@ def nested_scalar(path: Path, *keys: str) -> str | None:
         if len(keys) == 1:
             return head.group(1).strip().strip("'\"") or None
         # A nested key may sit at the same indentation (YAML block sequence
-        # style) or one level in; accept both.
+        # style) or one level in; accept both. Match only children indented
+        # strictly deeper than the parent key, and prefer the shallowest, so
+        # a deeper `gate.status` can never shadow `validation.status`.
+        parent_indent = len(line) - len(line.lstrip())
+        best: tuple[int, str] | None = None
         for follower in lines[index + 1:]:
-            if follower.strip() and re.match(r"^\S", follower) and not re.match(r"^\s*" + re.escape(keys[1]) + r"\s*:", follower):
+            if not follower.strip():
+                continue
+            indent = len(follower) - len(follower.lstrip())
+            if indent <= parent_indent:
                 break
             child = re.match(r"^\s*" + re.escape(keys[1]) + r"\s*:\s*(.*?)\s*$", follower)
-            if child:
-                return child.group(1).strip().strip("'\"") or None
-        return None
+            if child and (best is None or indent < best[0]):
+                best = (indent, child.group(1).strip().strip("'\""))
+        return best[1] if best else None
     return None
 
 
@@ -396,6 +414,57 @@ def task_name_id(task: Path) -> str | None:
 
 def refs_in(path: Path) -> set[str]:
     return set(ID_RE.findall(text(path)))
+
+
+def section_is_substantive(text: str) -> bool:
+    """A section carries information, not characters.
+
+    Counting characters accepted 24 dots, a dead link, and eleven sections
+    that all restated the same sentence. This requires real lexical content
+    and rejects repetition, punctuation, and markup-only filler.
+    """
+    body = re.sub(r"```.*?```", " ", text, flags=re.S)
+    body = re.sub(r"[`*_>#|\[\]()\[\]]", " ", body)
+    body = re.sub(r"https?://\S+", " ", body)
+    words = [word for word in re.findall(r"[A-Za-z][A-Za-z'-]+", body) if len(word) > 2]
+    if len(words) < 6:
+        return False
+    if len(set(word.lower() for word in words)) < 4:
+        return False
+    # Reject a section that is one sentence repeated.
+    sentences = [part.strip().lower() for part in re.split(r"[.!?]\s+", body.strip()) if part.strip()]
+    if sentences and len(set(sentences)) < len(sentences):
+        return False
+    return True
+
+
+def sections_are_independent(sections: dict[str, str]) -> bool:
+    """Distinct sections must not restate the same content.
+
+    Compares the dominant vocabulary of each section: eleven sections that
+    all carry the same sentence collapse to one fingerprint.
+    """
+    fingerprints: list[frozenset[str]] = []
+    for body in sections.values():
+        if not body.strip():
+            continue
+        words = [word.lower() for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", body)]
+        if not words:
+            fingerprints.append(frozenset())
+            continue
+        unique = set(words)
+        # Keep the most distinctive half of the vocabulary so a section's
+        # signature reflects what makes it different.
+        ranked = sorted(unique, key=lambda word: (-len(word), word))[: max(3, len(unique) // 2)]
+        fingerprints.append(frozenset(ranked))
+    if len(fingerprints) < 2:
+        return True
+    collisions = sum(
+        1 for index, first in enumerate(fingerprints)
+        for second in fingerprints[index + 1:]
+        if first and second and len(first & second) / len(first | second) > 0.6
+    )
+    return collisions == 0
 
 
 def frontmatter_scalar(path: Path, key: str) -> str | None:
@@ -726,7 +795,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 match.group(1)
                 for line in validation_text.splitlines()
                 if "|" in line
-                for match in [re.match(r"\|\s*(RUN-[A-Z0-9-]+)\s*\|.*?\|\s*\**fail\**\s*\|", line)]
+                for match in [re.match(r"\|\s*(RUN-[A-Z0-9-]+)\s*\|(?:[^|]*\|){3}\s*\**\s*(fail(?:ed|ure)?|partial)\s*\**\s*\|", line, re.I)]
                 if match
             })
             declared_validation_status = nested_scalar(state, "validation", "status") if state.exists() else None
@@ -749,17 +818,48 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 for heading in HANDOFF_HEADINGS:
                     if f"# {heading}" not in raw:
                         errors.append(f"handoff missing body section {heading}: {handoff.relative_to(root)}")
-                    elif len(sections.get(heading, "").strip()) < HANDOFF_MIN_BODY:
-                        errors.append(f"handoff section is empty or not actionable: {heading} in {handoff.relative_to(root)}")
+                    elif not section_is_substantive(sections.get(heading, "")):
+                        errors.append(f"handoff section carries no information: {heading} in {handoff.relative_to(root)}")
+                present = {heading: sections.get(heading, "") for heading in HANDOFF_HEADINGS if heading in sections}
+                if not sections_are_independent(present):
+                    errors.append(f"handoff sections restate the same content: {handoff.relative_to(root)}")
                 if "Source Session:" not in raw and "@[" not in raw:
                     errors.append(f"handoff has no source Session reference: {handoff.relative_to(root)}")
                 for field in ("next_action",):
                     value = frontmatter_scalar(handoff, field)
                     if value is not None and not is_actionable(value):
                         errors.append(f"handoff {field} is not actionable: {value!r} in {handoff.relative_to(root)}")
-                for referenced in sorted(set(re.findall(r"(?<![\w/.-])((?:\./)?(?:bin|docs|plugins|presets|evals|\.agent-workspace)/[\w./-]+\.\w+)", raw))):
-                    if not (root / referenced.removeprefix("./")).exists():
-                        errors.append(f"handoff references a path that does not exist: {referenced} in {handoff.relative_to(root)}")
+                objective = frontmatter_scalar(handoff, "objective")
+                if objective is not None and len(re.sub(r"\W+", " ", objective).split()) < 4:
+                    errors.append(f"handoff objective is not a substantive statement: {objective!r} in {handoff.relative_to(root)}")
+                # A handoff must be able to say "this file was removed" — that
+                # is exactly what the stale-information section is for. The
+                # exemption is per line AND the line must read as historical:
+                # an instruction ("Run ./x before continuing") asserts the path
+                # is live, so an adjacent removal note cannot license it.
+                removal = re.compile(
+                    r"\b(?:removed|renamed|deleted|moved|no longer|superseded|does not exist|"
+                    r"is gone|was dropped|obsolete|formerly|later became)\b", re.I)
+                instruction = re.compile(
+                    r"\b(?:run|read|open|execute|invoke|rebuild|regenerate|verify|check|inspect|"
+                    r"re-?run|update|edit|write|add|remove|delete|fix|review|await|wait|test|"
+                    r"consult|examine|follow|start|continue|resume|apply|reconcile)\b", re.I)
+                for referenced in sorted(set(re.findall(r"(?<![\w/.-])((?:\./|/)?(?:[Bb]in|docs|Docs|plugins|presets|evals|\.agent-workspace)/[\w./-]+\.?\w*)", raw))):
+                    cleaned = referenced.removeprefix("./").lstrip("/")
+                    if (root / cleaned).exists():
+                        continue
+                    # Exempt only if EVERY line that mentions the path reads as
+                    # historical. One instructional mention ("Run ./x before
+                    # continuing") asserts the path is live and must not be
+                    # licensed by a removal note on a different line.
+                    mentions = [line for line in raw.splitlines() if referenced in line]
+                    exempted = bool(mentions) and all(
+                        removal.search(line) and not instruction.search(line)
+                        for line in mentions
+                    )
+                    if exempted:
+                        continue
+                    errors.append(f"handoff references a path that does not exist: {referenced} in {handoff.relative_to(root)}")
                 revision_match = re.search(r"^state_revision:\s*(\d+)\s*$", raw, re.MULTILINE)
                 handoff_revision = int(revision_match.group(1)) if revision_match else None
                 match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", raw, re.MULTILINE)
