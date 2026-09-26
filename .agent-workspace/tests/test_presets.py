@@ -8,9 +8,14 @@ INSTALLED = Path.home() / ".dsh" / ".agent-presets"
 
 class PresetArchiveTests(unittest.TestCase):
     def test_archived_custom_presets_match_installed_sources(self):
+        # Parity is a property of a machine that has run the installer. On a
+        # clean CI runner there is nothing installed yet, so the check skips
+        # rather than asserting that an empty directory equals the archive.
         for preset in ["continuum", "continuum-curator"]:
-            archived = ROOT / "presets" / preset
             live = INSTALLED / preset
+            if not live.is_dir():
+                self.skipTest(f"{preset} is not installed at {live}; run ./install.sh first")
+            archived = ROOT / "presets" / preset
             archived_files = sorted(p.relative_to(archived) for p in archived.rglob("*") if p.is_file() and p.name not in {"README.md", "manifest.yaml"})
             live_files = sorted(p.relative_to(live) for p in live.rglob("*") if p.is_file())
             self.assertEqual(archived_files, live_files, preset)

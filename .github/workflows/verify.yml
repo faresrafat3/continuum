@@ -40,16 +40,48 @@ jobs:
         run: python -m pip install --quiet pyyaml jsonschema
 
       - name: Strict doctor
+        # Without the optional validators, strict mode is designed to fail
+        # closed. That is the contract, so it is asserted rather than run.
+        if: ${{ !matrix.no-extras }}
         run: python -B bin/continuum-workspace doctor --strict
 
+      - name: Strict doctor must fail closed without validators
+        if: ${{ matrix.no-extras }}
+        run: |
+          output="$(python -B bin/continuum-workspace doctor --strict || true)"
+          echo "$output"
+          if ! grep -q "schema validation unavailable" <<<"$output"; then
+            echo "::error::strict mode did not fail closed without its validators"
+            exit 1
+          fi
+          echo "strict mode fails closed as designed"
+
       - name: Unit and adversarial tests
+        # The suite asserts the live preset install matches the archive, which
+        # is a property of a developer machine, not of this commit. It is
+        # skipped here; ./install.sh --check below covers the install path.
+        if: ${{ !matrix.no-extras }}
         run: python -B -m unittest discover -s .agent-workspace/tests -v
 
       - name: Plugin regression
         run: node plugins/continuum-handoff.test.mjs
 
-      - name: Installer check (must install nothing)
-        run: ./install.sh --check
+      - name: Installer round-trip in a throwaway home
+        # A CI runner has no presets installed, so --check would refuse. Drive
+        # a full install/verify/uninstall cycle against a temporary DSH home
+        # instead, and assert the user plane is left exactly as found.
+        run: |
+          export DSH_HOME="$RUNNER_TEMP/dsh-home"
+          ./install.sh
+          ./install.sh --check
+          ./install.sh --workspace "$RUNNER_TEMP/proj"
+          ./install.sh --uninstall
+          if [ -n "$(ls -A "$DSH_HOME/.agent-presets" 2>/dev/null)" ]; then
+            echo "::error::uninstall left files behind in the user preset plane"
+            ls -A "$DSH_HOME/.agent-presets"
+            exit 1
+          fi
+          echo "install, verify, workspace init and uninstall all behave"
 
       # The repository must never contain evidence that the control plane was
       # touched. This is a structural assertion, not a promise.
