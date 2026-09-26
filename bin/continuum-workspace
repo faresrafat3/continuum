@@ -631,6 +631,236 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
     return errors, warnings
 
 
+def read_manifest_text(path: Path) -> str:
+    """Read a manifest without a leading BOM.
+
+    A UTF-8 BOM is valid in practice for package.json and makes
+    json.loads() fail, so manifests are decoded with utf-8-sig. CRLF is
+    harmless to every reader below.
+    """
+    return path.read_text(encoding="utf-8-sig")
+
+
+# Manifests are only ever looked for as direct children of a scope path, so a
+# nested example, vendor, or build tree is never auto-discovered.
+MANIFESTS: tuple[tuple[str, str], ...] = (
+    ("package.json", "npm"),
+    ("pyproject.toml", "python"),
+    ("Cargo.toml", "cargo"),
+    ("go.mod", "go"),
+)
+
+# A scope that is only a container has no manifest of its own.
+CONTAINER_KINDS = {"repository", "namespace", "docs", "infra"}
+# Kinds that must resolve to a real, installable package.
+PACKAGE_KINDS = {"application", "service", "library", "package"}
+
+
+def _toml_load(text_value: str) -> dict:
+    import tomllib
+    return tomllib.loads(text_value)
+
+
+def _npm_name(manifest: dict) -> tuple[str, bool, list[str]] | None:
+    name = manifest.get("name")
+    if not isinstance(name, str) or not name:
+        return None
+    dependencies: list[str] = []
+    for field in ("dependencies", "optionalDependencies", "peerDependencies"):
+        block = manifest.get(field)
+        if isinstance(block, dict):
+            dependencies.extend(str(key) for key in block)
+    return name, bool(manifest.get("private")), dependencies
+
+
+def _python_name(manifest: dict) -> tuple[str, bool, list[str]] | None:
+    project = manifest.get("project")
+    if isinstance(project, dict) and isinstance(project.get("name"), str) and project["name"]:
+        dependencies = []
+        for field in ("dependencies", "optional-dependencies"):
+            block = project.get(field)
+            if isinstance(block, list):
+                dependencies.extend(str(item).split(">")[0].split("=")[0].split("[")[0].split(";")[0].strip() for item in block)
+        return project["name"], False, dependencies
+    poetry = manifest.get("tool", {}).get("poetry") if isinstance(manifest.get("tool"), dict) else None
+    if isinstance(poetry, dict) and isinstance(poetry.get("name"), str) and poetry["name"]:
+        dependencies = []
+        for field in ("dependencies", "optional-dependencies"):
+            block = poetry.get(field)
+            if isinstance(block, dict):
+                dependencies.extend(str(key) for key in block if str(key).lower() != "python")
+        return poetry["name"], False, dependencies
+    return None
+
+
+def _cargo_name(manifest: dict) -> tuple[str, bool, list[str]] | None:
+    package = manifest.get("package")
+    if not isinstance(package, dict) or not isinstance(package.get("name"), str) or not package["name"]:
+        return None
+    dependencies: list[str] = []
+    for field in ("dependencies", "build-dependencies"):
+        block = manifest.get(field)
+        if isinstance(block, dict):
+            dependencies.extend(str(key) for key in block)
+    return package["name"], package.get("publish") is False, dependencies
+
+
+def _go_name(manifest_text: str) -> tuple[str, bool, list[str]] | None:
+    module = None
+    dependencies: list[str] = []
+    inside = False
+    for line in manifest_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("module "):
+            module = stripped.split(None, 1)[1].strip()
+        elif stripped.startswith("require ("):
+            inside = True
+        elif inside and stripped == ")":
+            inside = False
+        elif inside and stripped:
+            dependencies.append(stripped.split()[0])
+        elif stripped.startswith("require "):
+            dependencies.append(stripped.split()[1])
+    return (module, False, dependencies) if module else None
+
+
+def read_package_manifest(path: Path) -> tuple[str, str, bool, list[str]] | None:
+    """Return (ecosystem, name, private, internal-looking deps) or None."""
+    try:
+        raw = read_manifest_text(path)
+    except Exception as error:
+        raise ValueError(f"cannot read package manifest: {error}") from error
+    if path.name == "package.json":
+        import json
+        try:
+            parsed = json.loads(raw)
+        except Exception as error:
+            raise ValueError(f"cannot parse package manifest: {error}") from error
+        found = _npm_name(parsed) if isinstance(parsed, dict) else None
+        return ("npm", *found) if found else None
+    if path.name == "pyproject.toml":
+        parsed = _toml_load(raw)
+        found = _python_name(parsed)
+        return ("python", *found) if found else None
+    if path.name == "Cargo.toml":
+        parsed = _toml_load(raw)
+        found = _cargo_name(parsed)
+        return ("cargo", *found) if found else None
+    if path.name == "go.mod":
+        found = _go_name(raw)
+        return ("go", *found) if found else None
+    return None
+
+
+def package_scope_errors(root: Path, manifest: Path) -> list[str]:
+    """Cross-check declared scopes against real package manifests.
+
+    Only runs for `layout: monorepo`, because a single repository is
+    legitimately one un-packaged scope. Every rule fails closed: an
+    undeclared package, a declared package with no manifest, a duplicate
+    id, a manifest outside its scope, or a dependency cycle is an error.
+    """
+    try:
+        import yaml
+    except Exception:
+        return []
+    try:
+        data = yaml.safe_load(text(manifest)) or {}
+    except Exception as error:
+        return [f"cannot parse scope graph: {error}"]
+    scopes = data.get("scopes") or []
+    errors: list[str] = []
+    records: dict[str, dict] = {}
+    claimed_paths: dict[str, str] = {}
+
+    for scope in scopes:
+        if not isinstance(scope, dict):
+            continue
+        scope_id = scope.get("id")
+        scope_path = scope.get("path")
+        kind = scope.get("kind")
+        declared_package = scope.get("package")
+        if not isinstance(scope_id, str) or not isinstance(scope_path, str):
+            continue
+        relative = Path(scope_path)
+
+        # An unqualified id cannot be checked against an ecosystem.
+        if declared_package is not None and ":" not in str(declared_package):
+            errors.append(f"package id must be ecosystem-qualified: {scope_id} -> {declared_package}")
+            continue
+
+        found: tuple[str, str, bool, list[str]] | None = None
+        for filename, _ecosystem in MANIFESTS:
+            candidate = root / relative / filename
+            manifest_key = str(Path(scope_path) / filename)
+            if candidate.is_symlink():
+                errors.append(f"package manifest is a symlink: {scope_id} -> {scope_path}/{filename}")
+                continue
+            if not candidate.exists():
+                continue
+            if manifest_key in claimed_paths:
+                errors.append(
+                    f"two scopes claim the same manifest: {claimed_paths[manifest_key]} and {scope_id} -> {scope_path}/{filename}")
+                continue
+            claimed_paths[manifest_key] = scope_id
+            try:
+                found = read_package_manifest(candidate)
+            except ValueError as error:
+                errors.append(f"{error}: {scope_path}/{filename}")
+                continue
+            if found:
+                break
+
+        if str(kind) in PACKAGE_KINDS and not declared_package:
+            errors.append(f"package scope requires an ecosystem-qualified package id: {scope_id}")
+
+        if declared_package:
+            if not found:
+                errors.append(f"package scope requires a manifest: {scope_id} -> {scope_path}")
+                continue
+            ecosystem, name, _private, dependencies = found
+            expected_ecosystem, _, expected_name = str(declared_package).partition(":")
+            if expected_ecosystem != ecosystem:
+                errors.append(
+                    f"package manifest ecosystem does not match scope: {scope_id} declares {declared_package}, "
+                    f"found {ecosystem} at {scope_path}")
+            elif expected_name != name:
+                errors.append(
+                    f"package manifest does not match scope: {scope_id} declares {expected_name}, "
+                    f"found {name} at {scope_path}")
+            if expected_name in records:
+                errors.append(
+                    f"duplicate package id across scopes: {expected_name} -> {records[expected_name]['scope']}, {scope_id}")
+            else:
+                records[expected_name] = {"scope": scope_id, "ecosystem": ecosystem, "dependencies": dependencies}
+
+    # Only internal names create graph edges; external registries do not.
+    for name, record in records.items():
+        for dependency in record["dependencies"]:
+            if dependency in records and dependency != name:
+                record.setdefault("edges", []).append(dependency)
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node: str, trail: list[str]) -> None:
+        if node in visiting:
+            cycle = " -> ".join(trail[trail.index(node):] + [node])
+            errors.append(f"package dependency cycle reaches {node}: {cycle}")
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        for dependency in records.get(node, {}).get("edges", []):
+            visit(dependency, trail + [dependency])
+        visiting.discard(node)
+        visited.add(node)
+
+    for name in records:
+        visit(name, [name])
+    return errors
+
+
 def scope_graph_errors(root: Path, manifest: Path) -> list[str]:
     try:
         import yaml
@@ -736,6 +966,8 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if layout == "monorepo" and not (root / ".agent-workspace" / "projects").is_dir():
             errors.append("monorepo layout missing .agent-workspace/projects")
         errors.extend(scope_graph_errors(root, manifest))
+        if layout == "monorepo":
+            errors.extend(package_scope_errors(root, manifest))
     require_task_branch = bool(manifest.exists() and re.search(r"require_task_branch:\s*true", text(manifest)))
     task_ids: set[str] = set()
     run_ids: set[str] = set()

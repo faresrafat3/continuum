@@ -470,6 +470,203 @@ class WorkspaceCliTests(unittest.TestCase):
             self.assertEqual(doctor.returncode, 1, doctor.stdout)
             self.assertIn("validation ledger records a failed run while state claims pass", doctor.stdout)
 
+    def _monorepo(self, root):
+        """A monorepo scaffold plus a helper to add a scoped package."""
+        self.assertEqual(run("--root", str(root), "init", "--layout", "monorepo", "--mode", "full").returncode, 0)
+        return root / ".agent-workspace" / "workspace.yaml"
+
+    def _add_scope(self, manifest_path, scope_id, scope_path, kind, package):
+        """Insert a scope into the manifest's scopes list, not at end of file."""
+        lines = manifest_path.read_text(encoding="utf-8").splitlines()
+        out, inserted = [], False
+        for line in lines:
+            if line.startswith("policy:") and not inserted:
+                out.append(f"  - id: {scope_id}")
+                out.append(f"    path: {scope_path}")
+                out.append(f"    kind: {kind}")
+                out.append(f"    package: {package}")
+                out.append("    depends_on: []")
+                inserted = True
+            out.append(line)
+        self.assertTrue(inserted, "manifest has no policy block to anchor against")
+        manifest_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+    def test_package_scopes_match_supported_manifests(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_text(
+                '{"name": "acme-web", "private": true, "dependencies": {"acme-core": "^1.0.0", "left-pad": "^1.0.0"}}',
+                encoding="utf-8")
+            (root / "api").mkdir()
+            (root / "api" / "pyproject.toml").write_text(
+                '[project]\nname = "acme-api"\ndependencies = ["httpx>=0.27", "acme-core"]\n', encoding="utf-8")
+            (root / "engine").mkdir()
+            (root / "engine" / "Cargo.toml").write_text(
+                '[package]\nname = "acme-engine"\nversion = "0.1.0"\n\n[dependencies]\nserde = "1"\n', encoding="utf-8")
+            (root / "cli").mkdir()
+            (root / "cli" / "go.mod").write_text("module example.com/acme/cli\n\ngo 1.22\n", encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            self._add_scope(manifest, "api", "api", "service", "python:acme-api")
+            self._add_scope(manifest, "engine", "engine", "library", "cargo:acme-engine")
+            self._add_scope(manifest, "cli", "cli", "application", "go:example.com/acme/cli")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 0, doctor.stdout)
+
+    def test_package_id_must_be_qualified(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_text('{"name": "acme-web"}', encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package id must be ecosystem-qualified", doctor.stdout)
+
+    def test_declared_package_requires_a_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package scope requires a manifest", doctor.stdout)
+
+    def test_package_manifest_name_mismatch_is_reported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_text('{"name": "acme-actual"}', encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-claimed")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package manifest does not match scope", doctor.stdout)
+
+    def test_duplicate_package_id_across_scopes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            for name in ("a", "b"):
+                (root / name).mkdir()
+                (root / name / "package.json").write_text('{"name": "acme-dup"}', encoding="utf-8")
+            self._add_scope(manifest, "a", "a", "application", "npm:acme-dup")
+            self._add_scope(manifest, "b", "b", "application", "npm:acme-dup")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("duplicate package id across scopes", doctor.stdout)
+
+    def test_symlinked_package_manifest_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "real").mkdir()
+            (root / "real" / "package.json").write_text('{"name": "acme-web"}', encoding="utf-8")
+            (root / "web").mkdir()
+            (root / "web" / "package.json").symlink_to(root / "real" / "package.json")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package manifest is a symlink", doctor.stdout)
+
+    def test_nested_manifest_is_not_auto_discovered(self):
+        """A manifest below the scope path is not the scope's own manifest."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web" / "example").mkdir(parents=True)
+            (root / "web" / "example" / "package.json").write_text('{"name": "acme-example"}', encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package scope requires a manifest", doctor.stdout)
+
+    def test_two_scopes_cannot_claim_one_manifest(self):
+        """Two scopes pointing at the same path must not both claim the manifest."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_text('{"name": "acme-web"}', encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            # A second scope declared at the same path, with no package id, so
+            # it is a container that nonetheless resolves the same manifest.
+            lines = manifest.read_text(encoding="utf-8").splitlines()
+            out, inserted = [], False
+            for line in lines:
+                if line.startswith("policy:") and not inserted:
+                    out += ["  - id: webalias", "    path: web", "    kind: namespace",
+                            "    package: null", "    depends_on: []"]
+                    inserted = True
+                out.append(line)
+            manifest.write_text("\n".join(out) + "\n", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("two scopes claim the same manifest", doctor.stdout)
+
+    def test_invalid_manifest_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_text("{not json", encoding="utf-8")
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("cannot parse package manifest", doctor.stdout)
+
+    def test_manifest_with_utf8_bom_is_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "web").mkdir()
+            (root / "web" / "package.json").write_bytes(
+                b"\xef\xbb\xbf" + json.dumps({"name": "acme-web"}).encode("utf-8"))
+            self._add_scope(manifest, "web", "web", "application", "npm:acme-web")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 0, doctor.stdout)
+
+    def test_single_repo_layout_does_not_require_manifests(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init", "--mode", "full").returncode, 0)
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 0, doctor.stdout)
+            self.assertEqual(json.loads(doctor.stdout)["errors"], [])
+
+    def test_internal_package_cycle_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "a").mkdir()
+            (root / "a" / "package.json").write_text(
+                '{"name": "acme-a", "dependencies": {"acme-b": "^1.0.0"}}', encoding="utf-8")
+            (root / "b").mkdir()
+            (root / "b" / "package.json").write_text(
+                '{"name": "acme-b", "dependencies": {"acme-a": "^1.0.0"}}', encoding="utf-8")
+            self._add_scope(manifest, "a", "a", "library", "npm:acme-a")
+            self._add_scope(manifest, "b", "b", "library", "npm:acme-b")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("package dependency cycle reaches", doctor.stdout)
+
+    def test_external_dependencies_do_not_create_graph_edges(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._monorepo(root)
+            (root / "a").mkdir()
+            (root / "a" / "package.json").write_text(
+                '{"name": "acme-a", "dependencies": {"left-pad": "^1.0.0", "acme-b": "^1.0.0"}}', encoding="utf-8")
+            (root / "b").mkdir()
+            (root / "b" / "package.json").write_text('{"name": "acme-b"}', encoding="utf-8")
+            self._add_scope(manifest, "a", "a", "library", "npm:acme-a")
+            self._add_scope(manifest, "b", "b", "library", "npm:acme-b")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 0, doctor.stdout)
+
     def test_handoff_with_empty_section_bodies_is_rejected(self):
         """A heading is not a section. Structural completeness must not pass a hollow handoff."""
         with tempfile.TemporaryDirectory() as temp:
