@@ -51,10 +51,9 @@ jobs:
       - name: Installer check (must install nothing)
         run: ./install.sh --check
 
-      - name: Main System boundary
-        # The repository must never contain evidence that the control plane
-        # was touched. This is a structural assertion, not a promise.
-        name: Assert no DSH deployment paths are tracked
+      # The repository must never contain evidence that the control plane was
+      # touched. This is a structural assertion, not a promise.
+      - name: Assert no DSH deployment paths are tracked
         run: |
           if git ls-files | grep -E '(^|/)(\.nvm|node_modules)/|dsh-agent-presets|host\.cordis\.yml'; then
             echo "::error::a DSH deployment or control-plane path is tracked in this repository"

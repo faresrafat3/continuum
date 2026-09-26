@@ -683,6 +683,42 @@ class WorkspaceCliTests(unittest.TestCase):
         self.assertFalse(git_is_ancestor(repo, "0" * 40, head))
         self.assertTrue(git_is_ancestor(repo, head, head))
 
+    def test_workflow_yaml_has_no_duplicate_keys(self):
+        """A duplicate mapping key is accepted by PyYAML but rejected by GitHub.
+
+        GitHub refuses the whole workflow with no jobs scheduled and no
+        useful error, so this is caught here instead of in CI.
+        """
+        import yaml
+
+        class Strict(yaml.SafeLoader):
+            pass
+
+        def no_duplicates(loader, node, deep=False):
+            mapping = {}
+            for key_node, value_node in node.value:
+                key = loader.construct_object(key_node, deep=deep)
+                if key in mapping:
+                    raise yaml.constructor.ConstructorError(
+                        None, None,
+                        f"'{key}' is already defined at line {key_node.start_mark.line + 1}",
+                        key_node.start_mark)
+                mapping[key] = loader.construct_object(value_node, deep=deep)
+            return mapping
+
+        Strict.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_duplicates)
+        workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+        self.assertTrue(workflows, "no workflow found; this test would pass vacuously")
+        for path in workflows:
+            with self.subTest(workflow=path.name):
+                data = yaml.load(path.read_text(encoding="utf-8"), Loader=Strict)
+                self.assertIn("jobs", data, f"{path.name} has no jobs block")
+                for name, job in data["jobs"].items():
+                    for step in job.get("steps", []):
+                        self.assertTrue(
+                            step.get("uses") or step.get("run"),
+                            f"{path.name}:{name} has a step with neither uses nor run")
+
     def test_handoff_with_empty_section_bodies_is_rejected(self):
         """A heading is not a section. Structural completeness must not pass a hollow handoff."""
         with tempfile.TemporaryDirectory() as temp:
