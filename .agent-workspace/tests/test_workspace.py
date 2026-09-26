@@ -271,7 +271,9 @@ class WorkspaceCliTests(unittest.TestCase):
             + "".join("  - " + heading + "\n" for heading in headings)
             + "---\n\nSource Session: @[session-test]\n\n"
         )
-        return front + "".join("# " + heading + "\n\nBody.\n\n" for heading in headings)
+        return front + "".join(
+            "# " + heading + "\n\nRecorded evidence for the " + heading.lower() + " section of " + handoff_id + ".\n\n"
+            for heading in headings)
 
     def _seed_task_with_handoff(self, root, latest_handoff, revision=2):
         task = root / ".agent-workspace" / "tasks" / "T-0001-demo"
@@ -366,6 +368,89 @@ class WorkspaceCliTests(unittest.TestCase):
             doctor = run("--root", str(root), "doctor", "--strict")
             self.assertEqual(doctor.returncode, 1, doctor.stdout)
             self.assertIn("schema validation failed", doctor.stdout)
+
+    def test_handoff_with_empty_section_bodies_is_rejected(self):
+        """A heading is not a section. Structural completeness must not pass a hollow handoff."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            handoffs = task / "handoffs"
+            handoffs.mkdir()
+            solid = handoffs / "H-20260101-001.md"
+            solid.write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+            self.assertEqual(run("--root", str(root), "doctor", "--strict").returncode, 0)
+            front = re.match(r"---\n(.*?)\n---\n", solid.read_text(encoding="utf-8"), re.S).group(1)
+            hollow = "Source Session: @[session-test]\n\n" + "".join(
+                f"# {heading}\n\n \n\n" for heading in
+                ["Objective and acceptance target", "Confirmed facts and read set", "Completed",
+                 "Current operation", "Exact next action", "Decisions/spec/plan changes",
+                 "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts",
+                 "Stale or contradictory information", "Working tree and uncommitted paths"])
+            solid.write_text(f"---\n{front}\n---\n{hollow}", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("handoff section is empty or not actionable", doctor.stdout)
+
+    def test_handoff_next_action_must_be_actionable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            handoffs = task / "handoffs"
+            handoffs.mkdir()
+            (handoffs / "H-20260101-001.md").write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+            vague = re.sub(
+                r'^next_action:.*$', 'next_action: "Continue the work"',
+                (handoffs / "H-20260101-001.md").read_text(encoding="utf-8"), count=1, flags=re.MULTILINE)
+            (handoffs / "H-20260101-001.md").write_text(vague, encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("handoff next_action is not actionable", doctor.stdout)
+            self.assertEqual(run("--root", str(root), "close", "T-0001", "--dry-run").returncode, 1)
+
+    def test_handoff_path_references_must_exist(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            handoffs = task / "handoffs"
+            handoffs.mkdir()
+            body = self._handoff_body("H-20260101-001", 2)
+            (handoffs / "H-20260101-001.md").write_text(
+                body + "\nRead ./bin/does-not-exist and docs/nope.md before editing.\n", encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("handoff references a path that does not exist: docs/nope.md", doctor.stdout)
+
+    def test_ledger_fail_row_contradicts_state_pass(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=2)
+            (task / "handoffs").mkdir()
+            (task / "handoffs" / "H-20260101-001.md").write_text(self._handoff_body("H-20260101-001", 2), encoding="utf-8")
+            (task / "validation.md").write_text(
+                "# Validation\n\n| Run | Time | Gate | Git identity | Result | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| RUN-20260101-0900Z | 2026-01-01T09:00Z | unit | clean | pass | ok |\n", encoding="utf-8")
+            (task / "state.yaml").write_text(
+                "schema_version: 1\nkind: TaskState\ntask_id: T-0001\nstate_revision: 2\n"
+                "status: done\nphase: review\nreadiness: ready\nnext_action: Run ./bin/continuum-workspace doctor\n"
+                "working_tree: clean\ndirty_paths: []\nvalidation:\n  status: pass\n  run_ids: [RUN-20260101-0900Z]\n"
+                "latest_handoff: H-20260101-001\nexecution:\n  mode: read\n  actor: agent:test\n", encoding="utf-8")
+            (task / "task.yaml").write_text(
+                "schema_version: 1\nkind: Task\nid: T-0001\nslug: demo\ntitle: Demo\ntype: feature\n"
+                "status: done\npriority: p2\nprimary_scope: root\naffected_scopes: [root]\n"
+                "depends_on: []\nrelated:\n  research: []\n  decisions: []\n", encoding="utf-8")
+            baseline = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(baseline.returncode, 0, baseline.stdout)
+            with (task / "validation.md").open("a", encoding="utf-8") as handle:
+                handle.write("| RUN-20260101-1000Z | 2026-01-01T10:00Z | unit | clean | **fail** | broke |\n")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("validation ledger records a failed run while state claims pass", doctor.stdout)
+            self.assertEqual(run("--root", str(root), "close", "T-0001", "--dry-run").returncode, 1)
 
     def test_close_certifies_the_handoff_the_context_pack_ships(self):
         with tempfile.TemporaryDirectory() as temp:

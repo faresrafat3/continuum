@@ -26,6 +26,54 @@ SECRET_RE = re.compile(
     r"(?i)(sk-[A-Za-z0-9_-]{12,}|api[_-]?key\s*[:=]\s*[^\s#]+|token\s*[:=]\s*[^\s#]+|password\s*[:=]\s*[^\s#]+)"
 )
 
+HANDOFF_HEADINGS = [
+    "Objective and acceptance target", "Confirmed facts and read set", "Completed",
+    "Current operation", "Exact next action", "Decisions/spec/plan changes",
+    "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts",
+    "Stale or contradictory information", "Working tree and uncommitted paths",
+]
+HANDOFF_MIN_BODY = 24
+# A next action that names no path, id, command, or verification step is not
+# actionable no matter how confidently it is worded.
+VAGUE_NEXT_ACTIONS = {
+    "continue", "continue the work", "keep going", "proceed", "next", "tbd", "todo",
+    "n/a", "none", "fix it", "work on it", "carry on", "resume work", "do the thing",
+}
+
+
+def split_handoff_sections(raw: str) -> dict[str, str]:
+    """Split a handoff's Markdown body into heading -> text-beneath-it."""
+    body = re.sub(r"^---\n.*?\n---\n", "", raw, count=1, flags=re.S)
+    matches = list(re.finditer(r"^# (.+?)\s*$", body, re.MULTILINE))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        sections[match.group(1).strip()] = body[match.end():end]
+    return sections
+
+
+def is_actionable(value: str) -> bool:
+    """An instruction is actionable when it names a concrete target.
+
+    Deliberately narrow and deterministic: no model, no heuristics on tone.
+    A path, a command, a task/run/decision id, or a backticked token is enough.
+    """
+    candidate = str(value or "").strip()
+    if len(candidate) < 12:
+        return False
+    if candidate.rstrip(".!").lower() in VAGUE_NEXT_ACTIONS:
+        return False
+    if re.search(r"(?<![\w/.-])((?:\./)?(?:bin|docs|plugins|presets|evals|\.agent-workspace)/[\w./-]+)", candidate):
+        return True
+    if re.search(r"\b(?:T-\d{4}|H-\d{8}-\d{3}|RUN-[A-Z0-9-]+|ADR-\d{4}|RES-\d{4}|S\d+)\b", candidate):
+        return True
+    if re.search(r"`[^`]+`", candidate):
+        return True
+    if re.search(r"(?:run|read|open|execute|invoke|rebuild|regenerate|verify|check|inspect|re-run|rerun)\b", candidate, re.I):
+        return True
+    return False
+
+
 REQUIRED = [
     "AGENTS.md",
     "WORKSPACE.md",
@@ -56,6 +104,33 @@ def project_root() -> Path:
 def text(path: Path, limit: int | None = None) -> str:
     data = path.read_text(encoding="utf-8")
     return data if limit is None else data[:limit]
+
+
+def nested_scalar(path: Path, *keys: str) -> str | None:
+    """Read a scalar nested under an indented YAML block, without PyYAML.
+
+    Used where a contradictory record must still fail closed even when no
+    validator is available, so the check is never silently skipped.
+    """
+    lines = text(path).splitlines()
+    for index, line in enumerate(lines):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        head = re.match(r"^\s*" + re.escape(keys[0]) + r"\s*:\s*(.*?)\s*$", line)
+        if not head:
+            continue
+        if len(keys) == 1:
+            return head.group(1).strip().strip("'\"") or None
+        # A nested key may sit at the same indentation (YAML block sequence
+        # style) or one level in; accept both.
+        for follower in lines[index + 1:]:
+            if follower.strip() and re.match(r"^\S", follower) and not re.match(r"^\s*" + re.escape(keys[1]) + r"\s*:", follower):
+                break
+            child = re.match(r"^\s*" + re.escape(keys[1]) + r"\s*:\s*(.*?)\s*$", follower)
+            if child:
+                return child.group(1).strip().strip("'\"") or None
+        return None
+    return None
 
 
 def scalar(path: Path, key: str) -> str | None:
@@ -321,6 +396,25 @@ def task_name_id(task: Path) -> str | None:
 
 def refs_in(path: Path) -> set[str]:
     return set(ID_RE.findall(text(path)))
+
+
+def frontmatter_scalar(path: Path, key: str) -> str | None:
+    """Read a scalar from a Markdown file's YAML frontmatter only.
+
+    `scalar()` scans the whole file, so on a handoff it can match a template
+    line that happens to appear in the prose body. Frontmatter is the only
+    authoritative place for a handoff's typed fields.
+    """
+    raw = frontmatter(path)
+    if raw is None:
+        return None
+    pattern = re.compile(r"^\s*" + re.escape(key) + r"\s*:\s*(.*?)\s*$")
+    for line in raw.splitlines():
+        match = pattern.match(line)
+        if match:
+            value = match.group(1).strip().strip("'\"")
+            return None if value in {"null", "~", ""} else value
+    return None
 
 
 def frontmatter(path: Path) -> str | None:
@@ -625,6 +719,21 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             missing_runs = sorted(state_runs - declared_runs)
             if missing_runs:
                 errors.append(f"state run ids missing from validation ledger in {task.relative_to(root)}: {missing_runs}")
+            # A ledger row that records a failure contradicts a state that
+            # claims the task validated. Certifying that contradiction is
+            # exactly the false approval this gate exists to prevent.
+            failed_runs = sorted({
+                match.group(1)
+                for line in validation_text.splitlines()
+                if "|" in line
+                for match in [re.match(r"\|\s*(RUN-[A-Z0-9-]+)\s*\|.*?\|\s*\**fail\**\s*\|", line)]
+                if match
+            })
+            declared_validation_status = nested_scalar(state, "validation", "status") if state.exists() else None
+            if failed_runs and declared_validation_status == "pass":
+                errors.append(f"validation ledger records a failed run while state claims pass: {failed_runs} in {task.relative_to(root)}")
+            if failed_runs and task_status == "done" and declared_validation_status == "pass":
+                errors.append(f"task is done but its ledger has failing runs: {failed_runs} in {task.relative_to(root)}")
             if task_id:
                 dependency_graph[task_id] = list_field(record, "depends_on")
         handoff_dir = task / "handoffs"
@@ -632,11 +741,25 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             on_disk: list[tuple[str, Path, int | None]] = []
             for handoff in sorted(handoff_dir.glob("*.md")):
                 raw = text(handoff)
-                for heading in ["Objective and acceptance target", "Confirmed facts and read set", "Completed", "Current operation", "Exact next action", "Decisions/spec/plan changes", "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts", "Stale or contradictory information", "Working tree and uncommitted paths"]:
+                # A heading alone is not a section. Split on the required
+                # headings and require each to actually carry content, so a
+                # handoff cannot be structurally complete and semantically
+                # empty at the same time.
+                sections = split_handoff_sections(raw)
+                for heading in HANDOFF_HEADINGS:
                     if f"# {heading}" not in raw:
                         errors.append(f"handoff missing body section {heading}: {handoff.relative_to(root)}")
+                    elif len(sections.get(heading, "").strip()) < HANDOFF_MIN_BODY:
+                        errors.append(f"handoff section is empty or not actionable: {heading} in {handoff.relative_to(root)}")
                 if "Source Session:" not in raw and "@[" not in raw:
                     errors.append(f"handoff has no source Session reference: {handoff.relative_to(root)}")
+                for field in ("next_action",):
+                    value = frontmatter_scalar(handoff, field)
+                    if value is not None and not is_actionable(value):
+                        errors.append(f"handoff {field} is not actionable: {value!r} in {handoff.relative_to(root)}")
+                for referenced in sorted(set(re.findall(r"(?<![\w/.-])((?:\./)?(?:bin|docs|plugins|presets|evals|\.agent-workspace)/[\w./-]+\.\w+)", raw))):
+                    if not (root / referenced.removeprefix("./")).exists():
+                        errors.append(f"handoff references a path that does not exist: {referenced} in {handoff.relative_to(root)}")
                 revision_match = re.search(r"^state_revision:\s*(\d+)\s*$", raw, re.MULTILINE)
                 handoff_revision = int(revision_match.group(1)) if revision_match else None
                 match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", raw, re.MULTILINE)
