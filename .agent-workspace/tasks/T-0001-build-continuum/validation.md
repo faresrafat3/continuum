@@ -12,4 +12,6 @@
 
 | RUN-20260925-1420Z | 2026-09-25T14:20Z | adversarial hardening | code checkpoint `1e50443f0ae0376e5ba076c694ab1d01a9f5a397` | pass | closed recursive-audit findings: `status` scalar redaction, typed handoff `workspace`/`objective`/`next_action`/`blockers` fields, `additionalProperties: false` on major schemas, validation-policy network/mutation rejection and unknown-scope rejection, symlink rejection for scope paths, 27 unit tests and `node plugins/continuum-handoff.test.mjs`; `hand-3/pkg-14` Host running with `continuum_handoff` visible |
 
+| RUN-20260926-1410Z | 2026-09-26T14:10Z | live handoff smoke | process-local | pass | `continuum_handoff` called in the running Session at `hand-3/pkg-14`: returns bounded counts (185 user / 799 assistant / 1153 tool calls), canonical `@[session-4b69f49e-13ce-43e4-beaa-9d7ff9de084b]` reference, no transcript, `archiveAllowed: false`, `parentRetained: true`, `mutation: none`, goal/active-job/open-turn state surfaced, no secret in output |
+
 Raw output is intentionally not committed; rerun the configured commands and append a concise ledger row.
