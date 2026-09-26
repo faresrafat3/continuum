@@ -7,3 +7,5 @@
 {"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"task.status_changed","task_id":"T-0001","actor":"agent:continuum","from":"validating","to":"done","state_revision":6}
 {"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"handoff.written","task_id":"T-0001","actor":"agent:continuum","handoff_id":"H-20260925-003","state_revision":6}
 {"schema_version":1,"at":"2026-09-25T13:03:14Z","type":"validation.recorded","task_id":"T-0001","actor":"agent:continuum","run_id":"RUN-20260925-1300Z","result":"pass","state_revision":6}
+{"schema_version":1,"at":"2026-09-25T14:22:00Z","type":"validation.recorded","task_id":"T-0001","actor":"agent:continuum","run_id":"RUN-20260925-1420Z","result":"pass","state_revision":7}
+{"schema_version":1,"at":"2026-09-25T14:22:00Z","type":"hardening.closed","task_id":"T-0001","actor":"agent:continuum","state_revision":7,"note":"recursive adversarial audit findings closed: status redaction, typed handoff body, strict schema objects, validation policy safety, symlink scope rejection"}

@@ -10,4 +10,6 @@
 | RUN-20260925-0640Z | 2026-09-25T06:40Z | quiescence guard | process-local | pass | `hand-3/pkg-14`; source regression verifies bounded typed inputs, missing-service fail-closed, open-turn, active-job, paused/active-goal, redaction, child identity/workspace/preset, unknown-outcome, inspect-failure, and idempotency; WCS schema doctor passes |
 | RUN-20260925-1300Z | 2026-09-25T13:00Z | final metadata closure | code checkpoint `1e50443f0ae0376e5ba076c694ab1d01a9f5a397` | pass | task/state/handoff/validation reconciled; Main System boundary and deferred gates recorded; final metadata commit follows |
 
+| RUN-20260925-1420Z | 2026-09-25T14:20Z | adversarial hardening | code checkpoint `1e50443f0ae0376e5ba076c694ab1d01a9f5a397` | pass | closed recursive-audit findings: `status` scalar redaction, typed handoff `workspace`/`objective`/`next_action`/`blockers` fields, `additionalProperties: false` on major schemas, validation-policy network/mutation rejection and unknown-scope rejection, symlink rejection for scope paths, 27 unit tests and `node plugins/continuum-handoff.test.mjs`; `hand-3/pkg-14` Host running with `continuum_handoff` visible |
+
 Raw output is intentionally not committed; rerun the configured commands and append a concise ledger row.

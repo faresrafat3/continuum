@@ -97,6 +97,8 @@ def list_field(path: Path, key: str) -> list[str]:
 
 
 def redact(value: str) -> str:
+    if value is None:
+        return None  # type: ignore[return-value]
     text_value = str(value or "")
     text_value = re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----", "<REDACTED_PRIVATE_KEY>", text_value, flags=re.I)
     text_value = re.sub(r"https?://[^\s/@:]+:[^\s/@]+@", "https://<REDACTED_CREDENTIALS>@", text_value, flags=re.I)
@@ -248,6 +250,7 @@ profiles:
       - id: structure-review
         kind: manual
         description: "Review the initialized workspace and record the first baseline."
+        network: false
         mutation: false
 scope_requirements:
   root: [repo-fast]
@@ -426,6 +429,11 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
                 for step in profile.get("steps") or []:
                     if step.get("kind") == "command" and (not step.get("argv") or not step.get("timeout_seconds")):
                         errors.append(f"validation command step is not executable: {profile_name}/{step.get('id')}")
+                    if step.get("network") is True or step.get("mutation") is True:
+                        errors.append(f"validation step enables network/mutation and must be deferred: {profile_name}/{step.get('id')}")
+            for scope_id in (policy.get("scope_requirements") or {}):
+                if scope_id not in {"root"} and not (root / ".agent-workspace" / "projects" / scope_id).exists():
+                    errors.append(f"validation policy references unknown scope: {scope_id}")
         except Exception as error:
             errors.append(f"cannot inspect validation policy: {error}")
     return errors, warnings
@@ -773,12 +781,12 @@ def status(args: argparse.Namespace) -> int:
             match = re.search(r"^#\s+(.+)$", text(task), re.MULTILINE)
             title = match.group(1).strip() if match else task.stem
         rows.append({
-            "task": task_id,
-            "title": title,
-            "status": scalar(state, "status") if state.exists() else scalar(record, "status"),
-            "phase": scalar(state, "phase") if state.exists() else None,
-            "next_action": scalar(state, "next_action") if state.exists() else None,
-            "working_tree": scalar(state, "working_tree") if state.exists() else None,
+            "task": redact(task_id),
+            "title": redact(title),
+            "status": redact(scalar(state, "status")) if state.exists() else redact(scalar(record, "status")),
+            "phase": redact(scalar(state, "phase")) if state.exists() else None,
+            "next_action": redact(scalar(state, "next_action")) if state.exists() else None,
+            "working_tree": redact(scalar(state, "working_tree")) if state.exists() else None,
             "blockers": len(list_field(state, "blockers")) if state.exists() else 0,
         })
     print(json.dumps({"root": str(root), "tasks": rows}, indent=2))

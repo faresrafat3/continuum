@@ -217,6 +217,31 @@ class WorkspaceCliTests(unittest.TestCase):
             ignored = subprocess.run(["git", "check-ignore", "-q", relative], cwd=ROOT, check=False)
             self.assertNotEqual(ignored.returncode, 0, relative)
 
+    def test_status_redacts_secret_next_action(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = root / ".agent-workspace" / "tasks" / "T-0001-demo"
+            task.mkdir()
+            (task / "task.yaml").write_text("schema_version: 1\nkind: Task\nid: T-0001\nslug: demo\ntitle: Demo\ntype: feature\nstatus: in_progress\npriority: p2\nprimary_scope: root\naffected_scopes: [root]\ndepends_on: []\nrelated:\n  research: []\n  decisions: []\n", encoding="utf-8")
+            (task / "spec.md").write_text("# Spec\n", encoding="utf-8")
+            (task / "plan.md").write_text("# Plan\n", encoding="utf-8")
+            (task / "state.yaml").write_text("schema_version: 1\nkind: TaskState\ntask_id: T-0001\nstatus: in_progress\nnext_action: api_key=sk-supersecretvalue\n", encoding="utf-8")
+            (task / "validation.md").write_text("# Validation\n", encoding="utf-8")
+            result = run("--root", str(root), "status")
+            self.assertNotIn("supersecretvalue", result.stdout)
+            self.assertIn("<REDACTED>", result.stdout)
+
+    def test_validation_policy_rejects_network_or_mutation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            policy = root / ".agent-workspace" / "validation.yaml"
+            policy.write_text(policy.read_text(encoding="utf-8").replace("network: false", "network: true"), encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1)
+            self.assertIn("network/mutation", doctor.stdout)
+
     def test_close_is_dry_run_only(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

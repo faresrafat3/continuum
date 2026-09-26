@@ -1,5 +1,5 @@
 // Continuum Session Handoff + Human Fork
-// Source of record for dynamic DSH Package hand-3/pkg-10.
+// Source of record for dynamic DSH Package hand-3/pkg-14.
 //
 // This is intentionally a dynamic Host extension, not a Host composition row.
 // It operates on the current Agent-owned Session only. The model tool is

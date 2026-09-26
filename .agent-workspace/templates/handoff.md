@@ -10,6 +10,14 @@ checkpoint:
   commit: null
   tree_state: provisional-dirty
   validation_run_ids: []
+workspace:
+  root: /path/to/workspace
+  git_head: null
+  branch: main
+  dirty_paths: []
+objective: "State the recovery outcome in one sentence."
+next_action: "Verify the checkpoint, then perform exactly one concrete action."
+blockers: []
 sections:
   - Objective and acceptance target
   - Confirmed facts and read set
