@@ -17,6 +17,9 @@ let forkCalls = 0
 let missingServices = false
 let inspectFailures = 0
 let omitChildFields = false
+let childIdOverride = null
+let childCwdOverride = null
+let childPresetOverride = null
 const ctx = {
   get(name) {
     if (missingServices) return undefined
@@ -48,7 +51,11 @@ const ctx = {
     },
     async inspect(id) {
       if (inspectFailures > 0) { inspectFailures -= 1; throw new Error('temporary inspect failure') }
-      return { meta: { id: String(id), ...(omitChildFields ? {} : { cwd: '/tmp/example', agentPreset: 'continuum' }) } }
+      const meta = { id: String(id), ...(omitChildFields ? {} : { cwd: '/tmp/example', agentPreset: 'continuum' }) }
+      if (childIdOverride !== null) meta.id = childIdOverride
+      if (childCwdOverride !== null) meta.cwd = childCwdOverride
+      if (childPresetOverride !== null) meta.agentPreset = childPresetOverride
+      return { meta }
     }
   }
 }
@@ -127,6 +134,47 @@ const callsAfterMissingFields = forkCalls
 assert.equal((await fork.handler({ agent, rawInput: ' T-0005 ' })).kind, 'error')
 assert.equal(forkCalls, callsAfterMissingFields)
 omitChildFields = false
+
+// Each child-verification guard must fire on its own. The outcome cache alone
+// cannot prove these: a mismatched child is a security-relevant refusal, and
+// deleting any single check must be detectable by this suite.
+childIdOverride = 'a-different-session'
+const idMismatch = await fork.handler({ agent, rawInput: ' T-0006 ' })
+assert.equal(idMismatch.kind, 'error', 'child identity mismatch must be refused')
+const callsAfterIdMismatch = forkCalls
+assert.equal((await fork.handler({ agent, rawInput: ' T-0006 ' })).kind, 'error')
+assert.equal(forkCalls, callsAfterIdMismatch, 'a refused mismatch must not fork again')
+childIdOverride = null
+
+childCwdOverride = '/some/other/workspace'
+const cwdMismatch = await fork.handler({ agent, rawInput: ' T-0007 ' })
+assert.equal(cwdMismatch.kind, 'error', 'child workspace mismatch must be refused')
+const callsAfterCwdMismatch = forkCalls
+assert.equal((await fork.handler({ agent, rawInput: ' T-0007 ' })).kind, 'error')
+assert.equal(forkCalls, callsAfterCwdMismatch)
+childCwdOverride = null
+
+childPresetOverride = 'some-other-preset'
+const presetMismatch = await fork.handler({ agent, rawInput: ' T-0008 ' })
+assert.equal(presetMismatch.kind, 'error', 'child preset mismatch must be refused')
+const callsAfterPresetMismatch = forkCalls
+assert.equal((await fork.handler({ agent, rawInput: ' T-0008 ' })).kind, 'error')
+assert.equal(forkCalls, callsAfterPresetMismatch)
+childPresetOverride = null
+
+// The single-flight mutex must block a *different* task id, which the outcome
+// cache cannot intercept because the keys differ.
+let overlapSawBusy = false
+const first = fork.handler({ agent, rawInput: ' T-0010 ' })
+const second = fork.handler({ agent, rawInput: ' T-0011 ' })
+const [firstResult, secondResult] = await Promise.all([first, second])
+if (firstResult.kind === 'success') assert.equal(secondResult.kind, 'error')
+else { assert.equal(secondResult.kind, 'success'); overlapSawBusy = true }
+assert.ok(
+  firstResult.kind === 'error' || secondResult.kind === 'error',
+  'concurrent forks with different task ids must not both succeed'
+)
+void overlapSawBusy
 
 jobRows = [{ id: 'job-1', kind: 'test', status: 'running' }]
 const jobBlocked = await fork.handler({ agent, rawInput: ' T-0001 ' })
