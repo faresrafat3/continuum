@@ -412,10 +412,29 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
             value = normalize(yaml.safe_load(raw))
             if kind == "SourceLedger":
                 from urllib.parse import urlparse
+                ledger_path = path.parent
                 for source in value.get("sources", []) if isinstance(value, dict) else []:
                     parsed = urlparse(str(source.get("url", "")))
                     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
                         raise ValueError(f"source URL is not http(s): {source.get('id')}")
+                    # A local `path:` citation is a real evidence pointer: it
+                    # must exist, stay inside the workspace, and not escape it
+                    # through a symlink.
+                    local = source.get("path")
+                    if local is not None:
+                        candidate = Path(str(local))
+                        if candidate.is_absolute() or ".." in candidate.parts:
+                            raise ValueError(f"source path is not workspace-relative: {source.get('id')} -> {local}")
+                        resolved = (ledger_path / candidate).resolve()
+                        target = resolved if resolved.is_absolute() else (ledger_path / candidate)
+                        if not target.exists():
+                            raise ValueError(f"source path does not exist: {source.get('id')} -> {local}")
+                        try:
+                            resolved.relative_to(root.resolve())
+                        except ValueError:
+                            raise ValueError(f"source path escapes workspace: {source.get('id')} -> {local}") from None
+                        if (ledger_path / candidate).is_symlink():
+                            raise ValueError(f"source path is a symlink: {source.get('id')} -> {local}")
             validator = jsonschema.Draft202012Validator(schemas[kind], format_checker=jsonschema.FormatChecker())
             validation_errors = list(validator.iter_errors(value))
             if validation_errors:
@@ -425,6 +444,16 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
     if validation.exists():
         try:
             policy = yaml.safe_load(text(validation)) or {}
+            # Scope requirements must name a scope the manifest actually
+            # declares. A bare directory check would accept a phantom scope
+            # whose folder happens to exist.
+            declared_scopes: set[str] = set()
+            manifest_path = root / ".agent-workspace" / "workspace.yaml"
+            if manifest_path.exists():
+                manifest_data = yaml.safe_load(text(manifest_path)) or {}
+                for entry in manifest_data.get("scopes") or []:
+                    if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                        declared_scopes.add(entry["id"])
             for profile_name, profile in (policy.get("profiles") or {}).items():
                 for step in profile.get("steps") or []:
                     if step.get("kind") == "command" and (not step.get("argv") or not step.get("timeout_seconds")):
@@ -432,8 +461,8 @@ def schema_validation(root: Path, strict: bool = False) -> tuple[list[str], list
                     if step.get("network") is True or step.get("mutation") is True:
                         errors.append(f"validation step enables network/mutation and must be deferred: {profile_name}/{step.get('id')}")
             for scope_id in (policy.get("scope_requirements") or {}):
-                if scope_id not in {"root"} and not (root / ".agent-workspace" / "projects" / scope_id).exists():
-                    errors.append(f"validation policy references unknown scope: {scope_id}")
+                if scope_id not in declared_scopes:
+                    errors.append(f"validation policy references undeclared scope: {scope_id}")
         except Exception as error:
             errors.append(f"cannot inspect validation policy: {error}")
     return errors, warnings
@@ -524,6 +553,23 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
         if mode == "full":
             for relative in [".agent-workspace/context/architecture.md", ".agent-workspace/context/glossary.md", ".agent-workspace/research/index.yaml", ".agent-workspace/decisions/index.yaml"]:
                 if not (root / relative).exists(): errors.append(f"full mode missing: {relative}")
+            # A freshly scaffolded `full` workspace is structurally valid but
+            # carries no work. Make an empty scaffold distinguishable from a
+            # complete one instead of letting it read as a finished record.
+            def _has_real_record() -> bool:
+                tasks_root = root / ".agent-workspace" / "tasks"
+                if tasks_root.exists() and any(path.name == "task.yaml" for path in tasks_root.rglob("task.yaml")):
+                    return True
+                decisions_root = root / ".agent-workspace" / "decisions"
+                if decisions_root.exists() and any(path.name.startswith("ADR-") for path in decisions_root.rglob("ADR-*.md")):
+                    return True
+                research_root = root / ".agent-workspace" / "research"
+                if research_root.exists() and any(path.name == "research.yaml" for path in research_root.rglob("research.yaml")):
+                    return True
+                return False
+
+            if not _has_real_record():
+                warnings.append("full mode workspace has no task, decision, or research records yet; it is an empty scaffold")
         if layout == "monorepo" and not (root / ".agent-workspace" / "projects").is_dir():
             errors.append("monorepo layout missing .agent-workspace/projects")
         errors.extend(scope_graph_errors(root, manifest))
@@ -583,6 +629,7 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                 dependency_graph[task_id] = list_field(record, "depends_on")
         handoff_dir = task / "handoffs"
         if handoff_dir.exists():
+            on_disk: list[tuple[str, Path, int | None]] = []
             for handoff in sorted(handoff_dir.glob("*.md")):
                 raw = text(handoff)
                 for heading in ["Objective and acceptance target", "Confirmed facts and read set", "Completed", "Current operation", "Exact next action", "Decisions/spec/plan changes", "Validation evidence", "Blockers and questions", "Do not repeat / safe shortcuts", "Stale or contradictory information", "Working tree and uncommitted paths"]:
@@ -590,6 +637,8 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                         errors.append(f"handoff missing body section {heading}: {handoff.relative_to(root)}")
                 if "Source Session:" not in raw and "@[" not in raw:
                     errors.append(f"handoff has no source Session reference: {handoff.relative_to(root)}")
+                revision_match = re.search(r"^state_revision:\s*(\d+)\s*$", raw, re.MULTILINE)
+                handoff_revision = int(revision_match.group(1)) if revision_match else None
                 match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", raw, re.MULTILINE)
                 if match is None:
                     errors.append(f"handoff has no valid id: {handoff.relative_to(root)}")
@@ -597,7 +646,22 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
                     errors.append(f"duplicate handoff id: {match.group(1)}")
                 else:
                     handoff_ids.add(match.group(1))
+                    on_disk.append((match.group(1), handoff, handoff_revision))
                 run_ids.update(re.findall(r"\bRUN-[A-Z0-9-]+\b", raw))
+            # The context pack ships exactly one handoff. A stale or dangling
+            # `latest_handoff` would ship an artifact the gate never certified.
+            declared = scalar(state, "latest_handoff") if state.exists() else None
+            if state.exists() and declared is None and on_disk:
+                errors.append(f"state has no latest_handoff but {len(on_disk)} handoff(s) exist: {task.relative_to(root)}")
+            elif declared is not None and not any(item[0] == declared for item in on_disk):
+                errors.append(f"state latest_handoff does not resolve to a handoff: {declared} in {task.relative_to(root)}")
+            elif declared is not None and on_disk and declared != on_disk[-1][0]:
+                errors.append(f"state latest_handoff {declared} is not the newest handoff on disk ({on_disk[-1][0]}) in {task.relative_to(root)}")
+            certified = next((item for item in on_disk if item[0] == declared), None) if declared else (on_disk[-1] if on_disk else None)
+            revision_raw = scalar(state, "state_revision") if state.exists() else None
+            state_revision_value = int(revision_raw) if isinstance(revision_raw, str) and revision_raw.isdigit() else revision_raw
+            if certified and isinstance(state_revision_value, int) and certified[2] is not None and certified[2] < state_revision_value:
+                warnings.append(f"latest handoff {certified[0]} is at state_revision {certified[2]} but state is at {state_revision_value} in {task.relative_to(root)}")
         events = task / "events.ndjson"
         if events.exists():
             previous_revision = 0
@@ -803,15 +867,9 @@ def context(args: argparse.Namespace) -> int:
     base = task if task.is_dir() else task.parent
     ordered: list[Path] = [task if task.is_file() else base / "task.yaml"]
     ordered.extend([base / "spec.md", base / "state.yaml", base / "plan.md", base / "validation.md", base / "events.ndjson"])
-    handoffs = base / "handoffs"
-    if handoffs.exists():
-        latest_id = scalar(base / "state.yaml", "latest_handoff") if (base / "state.yaml").exists() else None
-        selected = handoffs / f"{latest_id}.md" if latest_id else None
-        if selected is None or not selected.exists():
-            candidates = sorted(handoffs.glob("*.md"), key=lambda path: path.name)
-            selected = candidates[-1] if candidates else None
-        if selected is not None:
-            ordered.append(selected)
+    selected, _candidates = select_latest_handoff(base)
+    if selected is not None:
+        ordered.append(selected)
     for directory in [root / ".agent-workspace" / "decisions", root / ".agent-workspace" / "research"]:
         if directory.exists():
             ordered.extend(sorted(
@@ -895,6 +953,24 @@ def context(args: argparse.Namespace) -> int:
     return 0
 
 
+def select_latest_handoff(base: Path) -> tuple[Path | None, list[Path]]:
+    """Resolve the handoff a fresh Session will actually receive.
+
+    The context pack ships `state.latest_handoff`; every gate must certify the
+    same artifact, so this is the single source of truth for both `context` and
+    `close`. Returns the selected path (or None) and every on-disk handoff.
+    """
+    handoffs = base / "handoffs"
+    candidates = sorted(handoffs.glob("*.md"), key=lambda path: path.name) if handoffs.exists() else []
+    if not candidates:
+        return None, []
+    latest_id = scalar(base / "state.yaml", "latest_handoff") if (base / "state.yaml").exists() else None
+    selected = handoffs / f"{latest_id}.md" if latest_id else None
+    if selected is None or not selected.exists():
+        selected = candidates[-1]
+    return selected, candidates
+
+
 def close(args: argparse.Namespace) -> int:
     if not args.dry_run:
         print(json.dumps({"ok": False, "error": "close is dry-run only; no data was changed"}))
@@ -908,8 +984,16 @@ def close(args: argparse.Namespace) -> int:
     record = base / "task.yaml"
     state = base / "state.yaml"
     validation = base / "validation.md"
-    handoffs = sorted((base / "handoffs").glob("*.md"), key=lambda path: path.name) if (base / "handoffs").exists() else []
-    latest = handoffs[-1] if handoffs else None
+    latest, handoff_candidates = select_latest_handoff(base)
+    declared_handoff = scalar(state, "latest_handoff") if state.exists() else None
+    newest_handoff_id = None
+    if handoff_candidates:
+        newest_match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", text(handoff_candidates[-1]), re.MULTILINE)
+        newest_handoff_id = newest_match.group(1) if newest_match else handoff_candidates[-1].stem
+    certified_handoff_id = None
+    if latest is not None:
+        certified_match = re.search(r"^id:\s*(H-[0-9]{8}-[0-9]{3})\s*$", text(latest), re.MULTILINE)
+        certified_handoff_id = certified_match.group(1) if certified_match else latest.stem
     doctor_errors, doctor_warnings = check_doctor(root, strict=True)
     git = git_identity(root)
     task_status = scalar(record, "status") if record.exists() else scalar(task, "status")
@@ -926,10 +1010,23 @@ def close(args: argparse.Namespace) -> int:
         "handoff_has_sections": "sections:" in handoff_text,
         "handoff_has_next_action": "Exact next action" in handoff_text,
         "handoff_has_source_reference": "Source Session:" in handoff_text or "@[" in handoff_text,
+        "handoff_matches_state_latest": bool(certified_handoff_id) and certified_handoff_id == declared_handoff,
+        "handoff_is_newest_on_disk": bool(certified_handoff_id) and certified_handoff_id == newest_handoff_id,
         "git_identity_present": git.get("head") is not None,
         "git_clean": not bool(git.get("status")),
     }
-    result = {"ok": all(checks.values()), "task": args.task_id, "checks": checks, "doctor_errors": doctor_errors, "doctor_warnings": doctor_warnings, "git": git, "changed": False}
+    result = {
+        "ok": all(checks.values()),
+        "task": args.task_id,
+        "checks": checks,
+        "certified_handoff": certified_handoff_id,
+        "declared_latest_handoff": declared_handoff,
+        "newest_handoff_on_disk": newest_handoff_id,
+        "doctor_errors": doctor_errors,
+        "doctor_warnings": doctor_warnings,
+        "git": git,
+        "changed": False,
+    }
     print(json.dumps(result, indent=2))
     return 0 if result["ok"] else 1
 

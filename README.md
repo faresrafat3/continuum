@@ -33,7 +33,7 @@ The model tool `continuum_handoff` is current-Session-only and read-only. It can
 ```sh
 cd /home/fares/continuum-system
 ./bin/continuum-workspace doctor --strict
-python3 -m unittest discover -s .agent-workspace/tests -v
+python3 -B -m unittest discover -s .agent-workspace/tests -v
 ./bin/continuum-workspace status
 ```
 

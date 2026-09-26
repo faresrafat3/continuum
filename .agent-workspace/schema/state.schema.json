@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "continuum/task-state/v1",
   "type": "object",
-  "required": ["schema_version", "kind", "task_id", "state_revision", "status", "phase", "readiness", "next_action", "working_tree", "validation"],
+  "required": ["schema_version", "kind", "task_id", "state_revision", "status", "phase", "readiness", "next_action", "working_tree", "validation", "latest_handoff", "execution"],
   "properties": {
     "schema_version": {"const": 1},
     "kind": {"const": "TaskState"},
