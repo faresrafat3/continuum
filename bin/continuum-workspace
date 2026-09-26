@@ -660,8 +660,13 @@ def check_doctor(root: Path, strict: bool = False) -> tuple[list[str], list[str]
             certified = next((item for item in on_disk if item[0] == declared), None) if declared else (on_disk[-1] if on_disk else None)
             revision_raw = scalar(state, "state_revision") if state.exists() else None
             state_revision_value = int(revision_raw) if isinstance(revision_raw, str) and revision_raw.isdigit() else revision_raw
-            if certified and isinstance(state_revision_value, int) and certified[2] is not None and certified[2] < state_revision_value:
-                warnings.append(f"latest handoff {certified[0]} is at state_revision {certified[2]} but state is at {state_revision_value} in {task.relative_to(root)}")
+            if certified and isinstance(state_revision_value, int) and certified[2] is not None:
+                if certified[2] < state_revision_value:
+                    warnings.append(f"latest handoff {certified[0]} is at state_revision {certified[2]} but state is at {state_revision_value} in {task.relative_to(root)}")
+                elif certified[2] > state_revision_value:
+                    # A handoff cannot describe a state revision the state has
+                    # not reached; that ordering is incoherent, not merely stale.
+                    errors.append(f"latest handoff {certified[0]} claims state_revision {certified[2]} but state is only at {state_revision_value} in {task.relative_to(root)}")
         events = task / "events.ndjson"
         if events.exists():
             previous_revision = 0

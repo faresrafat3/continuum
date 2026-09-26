@@ -340,6 +340,19 @@ class WorkspaceCliTests(unittest.TestCase):
             doctor = run("--root", str(root), "doctor", "--strict")
             self.assertIn("state_revision 4 but state is at 9", doctor.stdout)
 
+    def test_handoff_claiming_a_future_state_revision_is_rejected(self):
+        """The drift guard must be bidirectional, not only a staleness warning."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.assertEqual(run("--root", str(root), "init").returncode, 0)
+            task = self._seed_task_with_handoff(root, "H-20260101-001", revision=9)
+            (task / "handoffs").mkdir()
+            (task / "handoffs" / "H-20260101-001.md").write_text(self._handoff_body("H-20260101-001", 99), encoding="utf-8")
+            doctor = run("--root", str(root), "doctor", "--strict")
+            self.assertEqual(doctor.returncode, 1, doctor.stdout)
+            self.assertIn("claims state_revision 99 but state is only at 9", doctor.stdout)
+            self.assertEqual(run("--root", str(root), "close", "T-0001", "--dry-run").returncode, 1)
+
     def test_state_schema_requires_latest_handoff_and_execution(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
